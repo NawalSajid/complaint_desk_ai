@@ -18,7 +18,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool isLoading = false;
 
-  // ✅ ONLY ADDED (for eye icon)
   bool isPasswordVisible = false;
   bool isConfirmPasswordVisible = false;
 
@@ -81,8 +80,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(height: size.height * 0.1),
-
-              /// Logo
               Container(
                 padding: EdgeInsets.all(size.width * 0.05),
                 decoration: BoxDecoration(
@@ -245,7 +242,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  /// ✅ REUSED DECORATION (NO UI CHANGE)
   InputDecoration _inputDecoration(String hint, Size size, {Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,

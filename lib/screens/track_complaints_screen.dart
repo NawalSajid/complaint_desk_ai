@@ -4,6 +4,7 @@ import 'package:complaint_desk_ai/screens/complaints_screen.dart';
 import 'package:complaint_desk_ai/screens/profile_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../constants.dart';
 
 class TrackComplaintsScreen extends StatefulWidget {
   final String userId;
@@ -30,7 +31,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen> {
   Future<void> fetchComplaintStats() async {
     try {
       final response = await http.get(
-        Uri.parse('http://192.168.1.69:5000/api/complaints?user_id=${widget.userId}'),
+        Uri.parse('$baseUrl/api/complaints?user_id=${widget.userId}'),
       );
 
       if (response.statusCode == 200) {
@@ -113,14 +114,16 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen> {
                     ),
                     const SizedBox(height: 40),
 
-                    // ===== UPDATED GRIDVIEW VERSION =====
+ // GRIDVIEW
 GridView.count(
   shrinkWrap: true,
   physics: const NeverScrollableScrollPhysics(),
   crossAxisCount: 2,
   crossAxisSpacing: 20,
   mainAxisSpacing: 20,
-  childAspectRatio: 0.75, // reduced to prevent overflow on small screens
+  // prevent overflow on small screens
+  childAspectRatio: 0.75, 
+
   children: [
     _buildStatCard(
       total.toString(),
@@ -159,7 +162,6 @@ GridView.count(
               ),
             ),
 
-      // ===== BOTTOM NAV (UNCHANGED) =====
       bottomNavigationBar: Container(
         padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
         color: Colors.white,
@@ -197,7 +199,6 @@ GridView.count(
     );
   }
 
-  // ===== CARD WIDGET =====
   Widget _buildStatCard(
     String count,
     String label,
@@ -248,7 +249,6 @@ GridView.count(
     );
   }
 
-  // ===== NAV ITEM =====
   Widget _buildNavItem(String label, bool isActive, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,

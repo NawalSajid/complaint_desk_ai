@@ -49,7 +49,6 @@ class HomeScreen extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 10),
-              // Purple Dashboard Banner
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
@@ -99,7 +98,7 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 15),
-              // Single General Card Centered
+              // General Card Centered
               Center(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -169,7 +168,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Category Card (updated with onTap navigation)
+  // Category Card 
   Widget _buildCategoryCard(BuildContext context, String title, Color bgColor, Color iconColor) {
     return GestureDetector(
       onTap: () {

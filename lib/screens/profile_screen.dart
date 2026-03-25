@@ -20,12 +20,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int resolved = 0;
   bool isLoading = true;
 
-  String name = ''; // 🔹 fetch from database
+  String name = ''; // fetch from database
 
   @override
   void initState() {
     super.initState();
-    fetchProfile();       // 🔹 fetch name from backend
+    fetchProfile();       // fetch name from backend
     fetchComplaints();
   }
 
@@ -62,7 +62,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// ✏️ EDIT PROFILE
+  // EDIT PROFILE
   void _editProfile() {
     final nameController = TextEditingController(text: name);
 
@@ -138,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           body: jsonEncode({'name': newName}),
                         );
 
-                        if (!mounted) return; // ✅ check before using context
+                        if (!mounted) return; 
 
                         if (response.statusCode == 200) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -156,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           );
                         }
                       } catch (_) {
-                        if (!mounted) return; // ✅ check before using context
+                        if (!mounted) return; 
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text('Error connecting to server'),
@@ -165,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       }
 
-                      if (!mounted) return; // ✅ check before using context
+                      if (!mounted) return; 
                       Navigator.pop(context);
                     },
                     child: const Text('Save'),
@@ -179,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// 📝 FEEDBACK DIALOG (IMPROVED)
+  // FEEDBACK DIALOG 
   void _feedbackDialog() {
     final feedbackController = TextEditingController();
     showDialog(
@@ -260,7 +260,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// 🆘 HELP & SUPPORT
+  // HELP & SUPPORT DIALOG
   void _helpAndSupport() {
     showDialog(
       context: context,
@@ -292,13 +292,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(height: 20),
                       Text('Frequently Asked Questions', style: TextStyle(fontWeight: FontWeight.bold)),
                       SizedBox(height: 12),
-                      Text('1. How can I submit a complaint?\nNavigate to the Complaints section, select the appropriate category, provide a detailed description, and attach any relevant documents before submitting.'),
+                      Text('1. How can I submit a complaint?\nNavigate to the Complaints section, select the appropriate category, provide a detailed description, and attach any relevant documents(optional) before submitting.'),
                       SizedBox(height: 12),
                       Text('2. How do I track the status of my complaint?\nUse the Track Complaints screen to monitor the progress and status updates of your submitted complaints in real-time.'),
                       SizedBox(height: 12),
                       Text('3. What do the different complaint statuses indicate?\nPending: Complaint is received and awaiting review.\nIn-Progress: Complaint is actively being addressed.\nResolved: Complaint has been processed and closed.'),
                       SizedBox(height: 12),
-                      Text('4. Can I update my personal information?\nYes, select "Edit Profile" in Account Settings to modify your name or student ID.'),
+                      Text('4. Can I update my personal information?\nYes, select "Edit Profile" in Account Settings to modify your name.'),
                       SizedBox(height: 12),
                       Text('5. Who should I contact for urgent or unresolved issues?\nPlease contact the designated support email or your department’s administration for further assistance.'),
                     ],
@@ -347,7 +347,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  /// HEADER
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 30),
@@ -392,7 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const SizedBox(height: 40),
                   ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+                      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen(role: 'user',)));
                     },
                     icon: const Icon(Icons.logout, color: Color(0xFF9C27B0)),
                     label: const Text('Log out', style: TextStyle(color: Color(0xFF9C27B0))),
@@ -416,7 +415,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// STAT CARD
   Widget _stat(String count, String label, Color bg, Color accent, {IconData? icon}) {
     Color innerColor;
     Color iconColor;

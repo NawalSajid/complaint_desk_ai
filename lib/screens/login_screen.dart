@@ -6,7 +6,8 @@ import 'dart:convert';
 import '../constants.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String role; // NEW: role passed from RoleSelectionScreen
+  const LoginScreen({super.key, required this.role});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -17,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
 
   bool isLoading = false;
-  bool _obscurePassword = true; // ✅ ONLY ADDITION
+  bool _obscurePassword = true; 
 
   Future<void> loginUser() async {
     final email = emailController.text.trim();
@@ -34,7 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await http.post(
         Uri.parse('$baseUrl/api/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'role': widget.role, // UPDATED: send role to backend
+        }),
       );
 
       final data = jsonDecode(response.body);
@@ -152,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: size.height * 0.01),
 
-                    /// EMAIL FIELD (UNCHANGED)
+                    /// EMAIL FIELD
                     TextField(
                       controller: emailController,
                       decoration: InputDecoration(
@@ -197,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: size.height * 0.01),
 
-                    /// 🔐 PASSWORD FIELD (ONLY suffixIcon added)
+                    // PASSWORD FIELD 
                     TextField(
                       controller: passwordController,
                       obscureText: _obscurePassword,

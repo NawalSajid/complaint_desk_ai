@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import '../constants.dart';
 
 class ComplaintsScreen extends StatefulWidget {
-  final String userId; // Required
+  final String userId; 
 
   const ComplaintsScreen({super.key, required this.userId});
 
@@ -58,7 +58,6 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     );
   }
 
-  /// ✅ Helper to format timestamps like DB
   String formatDate(String rawDate) {
     try {
       DateTime dt = DateTime.parse(rawDate).toLocal(); // UTC → local
@@ -101,7 +100,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ADD A COMPLAINT Button
+              // COMPLAINT Button
               Center(
                 child: Container(
                   width: double.infinity,

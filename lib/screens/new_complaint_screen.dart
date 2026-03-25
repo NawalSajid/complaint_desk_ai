@@ -31,7 +31,6 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
   }
 
   Future<void> submitComplaint({bool dummy = false}) async {
-    // If dummy is true, we ignore empty fields
     String category = dummy ? 'General' : selectedCategory;
     String description =
         dummy ? 'This is a test complaint' : descriptionController.text;
@@ -63,7 +62,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Complaint added successfully')),
         );
-        Navigator.pop(context, true); // Refresh ComplaintsScreen
+        Navigator.pop(context, true); 
       } else {
         final data = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -103,7 +102,6 @@ class _NewComplaintScreenState extends State<NewComplaintScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Purple Banner
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 45),

@@ -1,2 +1,2 @@
 // lib/constants.dart
-const String baseUrl = 'http://10.11.25.18:5000';
+const String baseUrl = 'http://192.168.56.1:5000';

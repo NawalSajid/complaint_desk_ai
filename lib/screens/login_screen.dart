@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:complaint_desk_ai/screens/admin_dashboard_screen.dart';
 import 'package:complaint_desk_ai/screens/home_screen.dart';
 import 'package:complaint_desk_ai/screens/register_screen.dart';
 import 'package:complaint_desk_ai/screens/rolebased_screen.dart';
@@ -123,12 +124,22 @@ class _LoginScreenState extends State<LoginScreen>
           return;
         }
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => HomeScreen(userId: userId.toString()),
-          ),
-        );
+        // ── ROUTING: Admin → AdminDashboardScreen, User → HomeScreen ──
+        if (_isAdmin) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminDashboardScreen(adminId: userId.toString()),
+            ),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => HomeScreen(userId: userId.toString()),
+            ),
+          );
+        }
       } else {
         showMessage(data['message'] ?? 'Login failed');
       }

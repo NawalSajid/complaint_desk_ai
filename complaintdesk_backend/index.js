@@ -44,8 +44,15 @@ db.connect(err => {
         name VARCHAR(100) NOT NULL,
         email VARCHAR(100) NOT NULL UNIQUE,
         password VARCHAR(255) NOT NULL,
+        role ENUM('user','admin') NOT NULL DEFAULT 'user',
         created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Ensure legacy databases also have role column
+    db.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS role ENUM('user','admin') NOT NULL DEFAULT 'user'
     `);
 
     // Create complaints table if not exists
@@ -74,24 +81,26 @@ app.get('/', (req, res) => {
 // REGISTER API
 
 app.post('/api/register', async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, role } = req.body;
+  const safeRole = role === 'admin' ? 'admin' : 'user';
+  const normalizedEmail = (email || '').trim().toLowerCase();
   if (!name || !email || !password)
     return res.status(400).json({ message: 'All fields are required' });
 
-  db.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+  db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail], async (err, results) => {
     if (err) return res.status(500).json({ message: 'Database error' });
     if (results.length > 0) return res.status(400).json({ message: 'Email already registered' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
     db.query(
-      'INSERT INTO users (name, email, password) VALUES (?, ?, ?)',
-      [name, email, hashedPassword],
+      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+      [name, normalizedEmail, hashedPassword, safeRole],
       (err, result) => {
         if (err) return res.status(500).json({ message: 'Database error' });
 
         res.status(201).json({
           message: 'User registered successfully',
-          user: { id: result.insertId, name, email },
+          user: { id: result.insertId, name, email: normalizedEmail, role: safeRole },
         });
       }
     );
@@ -101,22 +110,41 @@ app.post('/api/register', async (req, res) => {
 // LOGIN API
 
 app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
+  const requestedRole = role === 'admin' ? 'admin' : 'user';
+  const normalizedEmail = (email || '').trim().toLowerCase();
   if (!email || !password)
     return res.status(400).json({ message: 'Email and password required' });
 
-  db.query('SELECT * FROM users WHERE email = ?', [email], async (err, results) => {
+  db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = ?', [normalizedEmail], async (err, results) => {
     if (err) return res.status(500).json({ message: 'Database error' });
     if (results.length === 0) return res.status(401).json({ message: 'Invalid email or password' });
 
     const user = results[0];
-    const isMatch = await bcrypt.compare(password, user.password);
+    // Support both properly hashed passwords and legacy plain-text records.
+    let isMatch = false;
+    if (typeof user.password === 'string' && user.password.startsWith('$2')) {
+      isMatch = await bcrypt.compare(password, user.password);
+    } else {
+      isMatch = password === user.password;
+      // Optional auto-migration to bcrypt after successful legacy login.
+      if (isMatch) {
+        const newHashed = await bcrypt.hash(password, 10);
+        db.query('UPDATE users SET password = ? WHERE id = ?', [newHashed, user.id]);
+      }
+    }
+
     if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
+
+    if ((user.role || 'user') !== requestedRole) {
+      return res.status(403).json({ message: 'Access denied for selected role' });
+    }
 
     res.status(200).json({
       message: 'Login successful',
       userId: user.id,
-      user: { id: user.id, name: user.name, email: user.email },
+      role: user.role || 'user',
+      user: { id: user.id, name: user.name, email: user.email, role: user.role || 'user' },
     });
   });
 });
@@ -237,4 +265,6 @@ app.get('/api/complaints', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+
 

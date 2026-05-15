@@ -5,11 +5,17 @@ import 'package:complaint_desk_ai/screens/track_complaints_screen.dart';
 import 'package:complaint_desk_ai/screens/profile_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:intl/intl.dart'; 
+import 'package:intl/intl.dart';
 import '../constants.dart';
 
+// ── Theme constants (matches HomeScreen / RoleSelectionScreen) ────────────────
+const Color _primary = Color.fromRGBO(156, 39, 176, 1);   // purple
+const Color _accent  = Color.fromRGBO(0, 188, 212, 1);    // cyan
+const Color _surface = Color(0xFFF7F7FB);
+const Color _cardBg  = Colors.white;
+
 class ComplaintsScreen extends StatefulWidget {
-  final String userId; 
+  final String userId;
 
   const ComplaintsScreen({super.key, required this.userId});
 
@@ -17,15 +23,33 @@ class ComplaintsScreen extends StatefulWidget {
   State<ComplaintsScreen> createState() => _ComplaintsScreenState();
 }
 
-class _ComplaintsScreenState extends State<ComplaintsScreen> {
+class _ComplaintsScreenState extends State<ComplaintsScreen>
+    with SingleTickerProviderStateMixin {
   List<dynamic> complaints = [];
   bool isLoading = false;
+
+  late AnimationController _controller;
+  late Animation<double> _fadeAnim;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _controller.forward();
     fetchComplaints();
   }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // ── BACKEND LOGIC — UNTOUCHED ─────────────────────────────────────────────
 
   Future<void> fetchComplaints() async {
     setState(() => isLoading = true);
@@ -60,179 +84,286 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
 
   String formatDate(String rawDate) {
     try {
-      DateTime dt = DateTime.parse(rawDate).toLocal(); // UTC → local
-      return DateFormat('yyyy-MM-dd HH:mm:ss').format(dt); // DB style
+      DateTime dt = DateTime.parse(rawDate).toLocal();
+      return DateFormat('yyyy-MM-dd HH:mm:ss').format(dt);
     } catch (e) {
-      return rawDate; // fallback
+      return rawDate;
     }
   }
+
+  // ── BUILD ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => HomeScreen(userId: widget.userId),
-              ),
-            );
-          },
-        ),
-        title: const Text(
-          'Complaints',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // COMPLAINT Button
-              Center(
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      bool? added = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              NewComplaintScreen(userId: widget.userId),
-                        ),
-                      );
+      backgroundColor: _surface,
+      body: FadeTransition(
+        opacity: _fadeAnim,
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: RefreshIndicator(
+                color: _primary,
+                onRefresh: fetchComplaints,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Add complaint button ───────────────────────────
+                      _buildAddButton(),
 
-                      if (added == true) {
-                        fetchComplaints();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      side: BorderSide(
-                          color: const Color(0xFF9C27B0).withAlpha(80)),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Color(0xFF03A9F4),
-                          child: Icon(Icons.add, color: Colors.white, size: 18),
-                        ),
-                        SizedBox(width: 10),
-                        Text(
-                          'ADD A COMPLAINT',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.1,
+                      const SizedBox(height: 28),
+
+                      // ── Section header ────────────────────────────────
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 3,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [_primary, _accent],
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'RECENT COMPLAINTS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: _primary,
+                                  letterSpacing: 1.5,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
+                          GestureDetector(
+                            onTap: fetchComplaints,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _primary.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.refresh_rounded,
+                                      size: 13, color: _primary),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Refresh',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // ── Complaint list ────────────────────────────────
+                      isLoading
+                          ? _buildLoadingState()
+                          : complaints.isEmpty
+                              ? _buildEmptyState()
+                              : Column(
+                                  children: complaints
+                                      .map((c) => _buildComplaintCard(
+                                            c['category'] ?? 'General',
+                                            c['description'] ?? '',
+                                            c['priority'] ?? 'Normal',
+                                            c['status'] ?? 'Pending',
+                                            c['category'] ?? 'General',
+                                            formatDate(c['created_at'] ?? ''),
+                                            '0 updates',
+                                          ))
+                                      .toList(),
+                                ),
+
+                      const SizedBox(height: 16),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 40),
-              // RECENT COMPLAINTS Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'RECENT COMPLAINTS:',
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+
+  Widget _buildHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: _cardBg,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFEEEEF5), width: 1),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          child: Row(
+            children: [
+              // Back button
+              GestureDetector(
+                onTap: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HomeScreen(userId: widget.userId),
+                  ),
+                ),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _primary.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 16,
+                    color: _primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Title
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'My Complaints',
                     style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      letterSpacing: 1.1,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A2E),
+                      letterSpacing: -0.4,
                     ),
                   ),
-                  TextButton(
-                    onPressed: fetchComplaints,
-                    child: const Text(
-                      'View All',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  Text(
+                    'Manage your submissions',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF9090A0),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
-              isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : complaints.isEmpty
-                      ? const Text('No complaints found.')
-                      : Column(
-                          children: complaints
-                              .map((c) => _buildComplaintCard(
-                                    c['category'] ?? 'General',
-                                    c['description'] ?? '',
-                                    c['priority'] ?? 'Normal',
-                                    c['status'] ?? 'Pending',
-                                    c['category'] ?? 'General',
-                                    formatDate(c['created_at'] ?? ''),
-                                    '0 updates',
-                                  ))
-                              .toList(),
-                        ),
-              const SizedBox(height: 30),
+              const Spacer(),
+              // Complaint count badge
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_primary, _accent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${complaints.length} total',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
-        decoration: const BoxDecoration(color: Colors.white),
+    );
+  }
+
+  // ── Add Button ────────────────────────────────────────────────────────────
+
+  Widget _buildAddButton() {
+    return GestureDetector(
+      onTap: () async {
+        bool? added = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                NewComplaintScreen(userId: widget.userId),
+          ),
+        );
+        if (added == true) {
+          fetchComplaints();
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [_primary, Color.fromRGBO(123, 82, 232, 1)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: _primary.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildNavItem('HOME', false, () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => HomeScreen(userId: widget.userId)),
-              );
-            }),
-            _buildNavItem('COMPLAINTS', true, () {}),
-            _buildNavItem('TRACK', false, () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) =>
-                        TrackComplaintsScreen(userId: widget.userId)),
-              );
-            }),
-            _buildNavItem('PROFILE', false, () {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => ProfileScreen(userId: widget.userId)),
-              );
-            }),
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.add_rounded,
+                  color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 10),
+                   Text(
+                      'Submit New Complaint',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        letterSpacing: 0.1,
+                      ),
+                    ),
           ],
         ),
       ),
     );
   }
+
+  // ── Complaint Card ────────────────────────────────────────────────────────
 
   Widget _buildComplaintCard(
     String title,
@@ -243,78 +374,415 @@ class _ComplaintsScreenState extends State<ComplaintsScreen> {
     String time,
     String updates,
   ) {
+    final statusColor = _statusColor(status);
+    final priorityColor = _priorityColor(priority);
+
     return Container(
-      padding: const EdgeInsets.all(20),
-      margin: const EdgeInsets.only(bottom: 15),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.grey.withAlpha(50)),
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEEEEF5), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 10),
-          Text(description,
-              style: const TextStyle(color: Colors.black54, fontSize: 12)),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              _buildTag(priority, const Color(0xFFFFEBEE), const Color(0xFFEF9A9A)),
-              const SizedBox(width: 8),
-              _buildTag(status, const Color(0xFFF3E5F5), const Color(0xFFCE93D8)),
-              const SizedBox(width: 8),
-              _buildTag(category, const Color(0xFFF5F5F5), Colors.black54),
-            ],
+          // ── Card top: category strip + status ──────────────────────────
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            decoration: BoxDecoration(
+              color: _primary.withValues(alpha: 0.03),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(18)),
+              border: Border(
+                bottom:
+                    BorderSide(color: _primary.withValues(alpha: 0.06), width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Category icon
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_primary, _accent],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    _categoryIcon(category),
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A2E),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                // Status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: statusColor.withValues(alpha: 0.3), width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 5,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        status,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              const Icon(Icons.access_time, size: 14, color: Colors.black54),
-              const SizedBox(width: 5),
-              Text(time,
-                  style: const TextStyle(fontSize: 11, color: Colors.black54)),
-              const SizedBox(width: 15),
-              const Icon(Icons.chat_bubble_outline, size: 14, color: Colors.black54),
-              const SizedBox(width: 5),
-              Text(updates,
-                  style: const TextStyle(fontSize: 11, color: Colors.black54)),
-            ],
+
+          // ── Card body ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Description
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF6B6B80),
+                    height: 1.5,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Priority + Category tags
+                Row(
+                  children: [
+                    _buildTag(priority, priorityColor),
+                    const SizedBox(width: 8),
+                    _buildTag(category, _accent),
+                    const Spacer(),
+                    // Updates chip
+                    Row(
+                      children: [
+                        Icon(Icons.chat_bubble_outline_rounded,
+                            size: 12,
+                            color: const Color(0xFFB0B0C0)),
+                        const SizedBox(width: 4),
+                        Text(
+                          updates,
+                          style: const TextStyle(
+                              fontSize: 10.5, color: Color(0xFFB0B0C0)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                // Divider
+                Container(
+                  height: 1,
+                  color: const Color(0xFFF0F0F5),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Time
+                Row(
+                  children: [
+                    Icon(Icons.access_time_rounded,
+                        size: 12,
+                        color: const Color(0xFFB0B0C0)),
+                    const SizedBox(width: 5),
+                    Text(
+                      time,
+                      style: const TextStyle(
+                          fontSize: 10.5,
+                          color: Color(0xFFB0B0C0)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTag(String label, Color bgColor, Color textColor) {
+  // ── Tag ───────────────────────────────────────────────────────────────────
+
+  Widget _buildTag(String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: bgColor, borderRadius: BorderRadius.circular(10)),
-      child: Text(label,
-          style: TextStyle(
-              color: textColor, fontSize: 10, fontWeight: FontWeight.bold)),
-    );
-  }
-
-  Widget _buildNavItem(String label, bool isActive, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          gradient: isActive
-              ? const LinearGradient(colors: [Color(0xFFBA68C8), Color(0xFF9C27B0)])
-              : const LinearGradient(colors: [Color(0xFFCE93D8), Color(0xFFBA68C8)]),
-          borderRadius: BorderRadius.circular(12),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 1),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: color,
         ),
-        child: Text(label,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
       ),
     );
   }
+
+  // ── Loading state ─────────────────────────────────────────────────────────
+
+  Widget _buildLoadingState() {
+    return Column(
+      children: List.generate(
+        3,
+        (_) => Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          height: 140,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFFEEEEF5)),
+          ),
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: _primary,
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: _primary.withValues(alpha: 0.07),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.inbox_outlined,
+                size: 30,
+                color: _primary,
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'No complaints yet',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A2E),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Tap the button above to submit one',
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF9090A0),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Bottom Nav ────────────────────────────────────────────────────────────
+
+  Widget _buildBottomNav() {
+    final items = [
+      _NavData('Home', Icons.home_outlined, Icons.home_rounded),
+      _NavData('Complaints', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded),
+      _NavData('Track', Icons.track_changes_outlined, Icons.track_changes_rounded),
+      _NavData('Profile', Icons.person_outline_rounded, Icons.person_rounded),
+    ];
+
+    const activeIndex = 1;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          top: BorderSide(color: Color(0xFFEEEEF5), width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(items.length, (i) {
+            final isActive = i == activeIndex;
+            final item = items[i];
+
+            void onTap() {
+              if (i == 0) {
+                Navigator.pushReplacement(context,
+                    MaterialPageRoute(
+                        builder: (_) => HomeScreen(userId: widget.userId)));
+              } else if (i == 1) {
+                // already here
+              } else if (i == 2) {
+                Navigator.pushReplacement(context,
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            TrackComplaintsScreen(userId: widget.userId)));
+              } else if (i == 3) {
+                Navigator.pushReplacement(context,
+                    MaterialPageRoute(
+                        builder: (_) =>
+                            ProfileScreen(userId: widget.userId)));
+              }
+            }
+
+            return GestureDetector(
+              onTap: onTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? _primary.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isActive ? item.activeIcon : item.icon,
+                      size: 22,
+                      color: isActive ? _primary : const Color(0xFFAAAAAC),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      item.label.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: isActive
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color:
+                            isActive ? _primary : const Color(0xFFAAAAAC),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return const Color(0xFFE67E22);
+      case 'resolved':
+        return const Color(0xFF0BAB64);
+      case 'rejected':
+        return const Color(0xFFE84393);
+      case 'in progress':
+      case 'inprogress':
+        return const Color(0xFF2979FF);
+      default:
+        return _primary;
+    }
+  }
+
+  Color _priorityColor(String priority) {
+    switch (priority.toLowerCase()) {
+      case 'high':
+        return const Color(0xFFE84393);
+      case 'medium':
+        return const Color(0xFFE67E22);
+      case 'low':
+        return const Color(0xFF0BAB64);
+      default:
+        return _accent;
+    }
+  }
+
+  IconData _categoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'academic':
+        return Icons.school_outlined;
+      case 'hostel':
+        return Icons.apartment_outlined;
+      case 'transport':
+        return Icons.directions_bus_outlined;
+      case 'harassment':
+        return Icons.shield_outlined;
+      default:
+        return Icons.chat_bubble_outline_rounded;
+    }
+  }
+}
+
+class _NavData {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+  const _NavData(this.label, this.icon, this.activeIcon);
 }

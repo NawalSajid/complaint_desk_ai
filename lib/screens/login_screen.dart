@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:complaint_desk_ai/screens/admin_dashboard_screen.dart';
+import 'package:complaint_desk_ai/screens/admin_complaint_screen.dart';
 import 'package:complaint_desk_ai/screens/home_screen.dart';
 import 'package:complaint_desk_ai/screens/register_screen.dart';
 import 'package:complaint_desk_ai/screens/rolebased_screen.dart';
@@ -129,7 +129,7 @@ class _LoginScreenState extends State<LoginScreen>
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (_) => AdminDashboardScreen(adminId: userId.toString()),
+              builder: (_) => AdminRoot(adminId: userId.toString()),
             ),
           );
         } else {

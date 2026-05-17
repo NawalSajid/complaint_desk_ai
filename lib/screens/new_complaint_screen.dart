@@ -9,7 +9,6 @@ import '../constants.dart';
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 const Color _primary   = Color.fromRGBO(156, 39, 176, 1);
 const Color _accent    = Color.fromRGBO(0, 188, 212, 1);
-const Color _violet    = Color(0xFF5C35CC);
 const Color _surface   = Color(0xFFF4F4FA);
 const Color _cardBg    = Colors.white;
 const Color _inkDark   = Color(0xFF14142B);
@@ -17,7 +16,6 @@ const Color _inkMid    = Color(0xFF6B6B8A);
 const Color _inkLight  = Color(0xFFB0B0C8);
 const Color _border    = Color(0xFFE8E8F0);
 const Color _green     = Color(0xFF0BAB64);
-const Color _pink      = Color(0xFFE84393);
 
 class NewComplaintScreen extends StatefulWidget {
   final String userId;
@@ -122,9 +120,10 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
     String description = dummy ? 'This is a test complaint' : descriptionController.text;
 
     if (!dummy && (category.isEmpty || description.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please select category and enter description')),
+      _showSnackBar(
+        message: 'Please select a category and enter a description.',
+        icon: Icons.info_outline_rounded,
+        isError: true,
       );
       return;
     }
@@ -146,25 +145,97 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
       if (!mounted) return;
 
       if (response.statusCode == 201) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Complaint added successfully')),
+        _showSnackBar(
+          message: 'Complaint submitted successfully.',
+          icon: Icons.check_circle_outline_rounded,
+          isError: false,
         );
         Navigator.pop(context, true);
       } else {
         final data = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? 'Failed to add complaint')),
+        _showSnackBar(
+          message: data['message'] ?? 'Failed to submit complaint.',
+          icon: Icons.error_outline_rounded,
+          isError: true,
         );
       }
     } catch (e) {
       debugPrint('Error submitting complaint: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error connecting to server')),
+      _showSnackBar(
+        message: 'Unable to connect. Please try again.',
+        icon: Icons.wifi_off_rounded,
+        isError: true,
       );
     } finally {
       if (mounted) setState(() => isSubmitting = false);
     }
+  }
+
+  // ── Professional Snackbar ─────────────────────────────────────────────────
+
+  void _showSnackBar({
+    required String message,
+    required IconData icon,
+    required bool isError,
+  }) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        padding: EdgeInsets.zero,
+        backgroundColor: const Color.fromARGB(255, 56, 31, 67),
+        elevation: 0,
+        duration: const Duration(seconds: 3),
+        content: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 56, 31, 67),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.18),
+                blurRadius: 20,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: isError
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : _green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  icon,
+                  size: 17,
+                  color: isError ? const Color(0xFFCCCCDD) : _green,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFFE8E8F0),
+                    height: 1.4,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ── BUILD ─────────────────────────────────────────────────────────────────
@@ -195,8 +266,10 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                       const SizedBox(height: 14),
                       _buildDescriptionField(),
                       const SizedBox(height: 12),
-                      _buildAttachmentRow(),
-                      const SizedBox(height: 10),
+                      _buildSectionLabel(Icons.attach_file_rounded, 'SUPPORTING DOCUMENT'),
+                      const SizedBox(height: 14),
+                      _buildAttachmentSection(),
+                      const SizedBox(height: 16),
                       _buildPrivacyNote(),
                       const SizedBox(height: 30),
                       _buildSubmitButton(),
@@ -229,7 +302,6 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
         bottom: false,
         child: Column(
           children: [
-            // Nav bar
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
               child: Row(
@@ -242,7 +314,6 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                 ],
               ),
             ),
-            // Hero card
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
               child: _HeroCard(),
@@ -331,17 +402,12 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header strip
           Container(
             padding: const EdgeInsets.fromLTRB(16, 13, 16, 12),
             decoration: BoxDecoration(
               color: _primary.withValues(alpha: 0.025),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(17)),
-              border: Border(
-                bottom: BorderSide(
-                    color: _border, width: 1),
-              ),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+              border: Border(bottom: BorderSide(color: _border, width: 1)),
             ),
             child: Row(
               children: [
@@ -352,8 +418,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                     color: _primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.edit_note_rounded,
-                      size: 14, color: _primary),
+                  child: const Icon(Icons.edit_note_rounded, size: 14, color: _primary),
                 ),
                 const SizedBox(width: 10),
                 const Text(
@@ -367,8 +432,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: _accent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -386,7 +450,6 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
               ],
             ),
           ),
-          // Input
           TextField(
             controller: descriptionController,
             maxLines: 7,
@@ -405,28 +468,22 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                 fontSize: 13,
                 height: 1.65,
               ),
-              contentPadding:
-                  const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
             ),
           ),
-          // Footer
           Container(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 13),
             decoration: BoxDecoration(
               color: _surface.withValues(alpha: 0.6),
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(17)),
-              border: Border(
-                top: BorderSide(color: _border, width: 1),
-              ),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(17)),
+              border: Border(top: BorderSide(color: _border, width: 1)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
-                    size: 12, color: _inkLight),
+                const Icon(Icons.info_outline_rounded, size: 12, color: _inkLight),
                 const SizedBox(width: 6),
                 const Text(
                   'More detail leads to faster resolution',
@@ -455,115 +512,103 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
     );
   }
 
-  // ── Attachment Row ────────────────────────────────────────────────────────
+  // ── Attachment Section (redesigned) ───────────────────────────────────────
 
-  Widget _buildAttachmentRow() {
+  Widget _buildAttachmentSection() {
     final attached = _fileName != null;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
+    return Container(
       decoration: BoxDecoration(
         color: _cardBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: attached ? _green.withValues(alpha: 0.45) : _border,
-          width: 1.3,
+          color: attached ? _green.withValues(alpha: 0.35) : _border,
+          width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: attached
-                ? _green.withValues(alpha: 0.09)
-                : Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            spreadRadius: -1,
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
             offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         children: [
-          // ── Top strip ──────────────────────────────────────────────────
+          // ── Info row ──────────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 13, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
             decoration: BoxDecoration(
               color: attached
-                  ? _green.withValues(alpha: 0.04)
-                  : _primary.withValues(alpha: 0.025),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(17)),
-              border: Border(
-                bottom: BorderSide(color: _border, width: 1),
-              ),
+                  ? _green.withValues(alpha: 0.03)
+                  : _surface.withValues(alpha: 0.5),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+              border: Border(bottom: BorderSide(color: _border, width: 1)),
             ),
             child: Row(
               children: [
                 Container(
-                  width: 28,
-                  height: 28,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: attached
-                        ? _green.withValues(alpha: 0.12)
-                        : _primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(8),
+                        ? _green.withValues(alpha: 0.1)
+                        : _inkLight.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    attached
-                        ? Icons.task_alt_rounded
-                        : Icons.attach_file_rounded,
-                    size: 14,
-                    color: attached ? _green : _primary,
+                    attached ? Icons.task_alt_rounded : Icons.attach_file_rounded,
+                    size: 16,
+                    color: attached ? _green : _inkMid,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  attached ? 'Document Attached' : 'Supporting Document',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: attached ? _green : _inkDark,
-                    letterSpacing: -0.1,
-                  ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      attached ? 'Document attached' : 'Attach a document',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: attached ? _green : _inkDark,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      attached ? _fileName! : 'JPG, PNG, PDF or DOC · Max 10 MB',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: attached ? _green.withValues(alpha: 0.75) : _inkLight,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
                 const Spacer(),
                 if (attached)
                   GestureDetector(
                     onTap: () => setState(() => _fileName = null),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 4),
+                      width: 30,
+                      height: 30,
                       decoration: BoxDecoration(
-                        color: _pink.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _pink.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
+                        color: _inkLight.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.close_rounded,
-                              size: 11, color: _pink),
-                          SizedBox(width: 3),
-                          Text(
-                            'Remove',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: _pink,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: const Icon(Icons.close_rounded, size: 15, color: _inkMid),
                     ),
                   )
                 else
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 9, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _inkLight.withValues(alpha: 0.1),
+                      color: _inkLight.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _border, width: 1),
                     ),
                     child: const Text(
                       'Optional',
@@ -571,6 +616,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                         fontSize: 10,
                         color: _inkLight,
                         fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ),
@@ -578,68 +624,190 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
             ),
           ),
 
-          // ── Main drop zone ─────────────────────────────────────────────
-          GestureDetector(
-            onTap: _pickFile,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              decoration: BoxDecoration(
-                color: attached
-                    ? _green.withValues(alpha: 0.03)
-                    : Colors.transparent,
-              ),
-              child: attached
-                  ? _AttachedFilePreview(fileName: _fileName!)
-                  : _DropZonePrompt(),
-            ),
-          ),
-
-          // ── Footer format bar ──────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            decoration: BoxDecoration(
-              color: _surface.withValues(alpha: 0.7),
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(17)),
-              border: Border(
-                top: BorderSide(color: _border, width: 1),
-              ),
-            ),
-            child: Row(
-              children: [
-                _FormatChip(
-                    icon: Icons.image_outlined, label: 'JPG / PNG'),
-                const SizedBox(width: 8),
-                _FormatChip(
-                    icon: Icons.picture_as_pdf_outlined, label: 'PDF'),
-                const SizedBox(width: 8),
-                _FormatChip(
-                    icon: Icons.description_outlined, label: 'DOC'),
-                const Spacer(),
-                Row(
+          // ── Upload area ───────────────────────────────────────────────
+          if (!attached)
+            GestureDetector(
+              onTap: _pickFile,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
+                child: Column(
                   children: [
-                    Icon(Icons.info_outline_rounded,
-                        size: 11,
-                        color: _inkLight.withValues(alpha: 0.7)),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Max 10 MB',
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: _inkLight.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: _border, width: 1.5),
+                      ),
+                      child: const Icon(
+                        Icons.upload_file_outlined,
+                        size: 22,
+                        color: _inkMid,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Tap to browse',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _primary.withValues(alpha: 0.85),
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                          const TextSpan(
+                            text: '  or drag a file here',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: _inkMid,
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'Screenshots, photos or documents related to your complaint',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 10,
-                        color: _inkLight.withValues(alpha: 0.7),
-                        fontWeight: FontWeight.w500,
+                        fontSize: 11,
+                        color: _inkLight,
+                        height: 1.5,
                       ),
                     ),
                   ],
                 ),
-              ],
+              ),
+            )
+          else
+            // ── Attached preview ─────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: _fileColor(_fileName!).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(_fileIcon(_fileName!),
+                        color: _fileColor(_fileName!), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _fileName!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _inkDark,
+                            letterSpacing: -0.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        const Text(
+                          'Ready to submit with your complaint',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: _green,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.check_circle_rounded, color: _green, size: 20),
+                ],
+              ),
             ),
-          ),
+
+          // ── Format footer ─────────────────────────────────────────────
+          if (!attached)
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+              decoration: BoxDecoration(
+                color: _surface.withValues(alpha: 0.6),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(17)),
+                border: Border(top: BorderSide(color: _border, width: 1)),
+              ),
+              child: Row(
+                children: [
+                  _FormatChip(icon: Icons.image_outlined,        label: 'JPG / PNG'),
+                  const SizedBox(width: 8),
+                  _FormatChip(icon: Icons.picture_as_pdf_outlined, label: 'PDF'),
+                  const SizedBox(width: 8),
+                  _FormatChip(icon: Icons.description_outlined,  label: 'DOC'),
+                ],
+              ),
+            ),
+
+          if (attached)
+            Container(
+              height: 1,
+              margin: const EdgeInsets.symmetric(horizontal: 14),
+              color: _border,
+            ),
+          if (attached)
+            GestureDetector(
+              onTap: _pickFile,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 11),
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(17)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.swap_horiz_rounded, size: 14, color: _inkLight),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Replace file',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: _inkLight,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  // ── File helpers ──────────────────────────────────────────────────────────
+
+  IconData _fileIcon(String name) {
+    final ext = name.split('.').last.toLowerCase();
+    if (ext == 'pdf')                           return Icons.picture_as_pdf_outlined;
+    if (ext == 'doc' || ext == 'docx')          return Icons.description_outlined;
+    if (['jpg','jpeg','png'].contains(ext))     return Icons.image_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  Color _fileColor(String name) {
+    final ext = name.split('.').last.toLowerCase();
+    if (ext == 'pdf')                           return const Color(0xFFE53935);
+    if (ext == 'doc' || ext == 'docx')          return const Color(0xFF1565C0);
+    if (['jpg','jpeg','png'].contains(ext))     return const Color(0xFF00897B);
+    return _primary;
   }
 
   // ── Privacy Note ──────────────────────────────────────────────────────────
@@ -649,23 +817,18 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Row(
         children: [
-          Icon(Icons.lock_outline_rounded,
-              size: 11, color: _inkLight.withValues(alpha: 0.8)),
+          Icon(Icons.lock_outline_rounded, size: 11, color: _inkLight.withValues(alpha: 0.8)),
           const SizedBox(width: 5),
           const Text(
             'Your submission is encrypted and kept confidential.',
-            style: TextStyle(
-              fontSize: 10.5,
-              color: _inkLight,
-              letterSpacing: 0.1,
-            ),
+            style: TextStyle(fontSize: 10.5, color: _inkLight, letterSpacing: 0.1),
           ),
         ],
       ),
     );
   }
 
-  // ── Submit Button ─────────────────────────────────────────────────────────
+  // ── Submit Button (clean & professional) ──────────────────────────────────
 
   Widget _buildSubmitButton() {
     return Column(
@@ -676,66 +839,57 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
             onTap: isSubmitting ? null : () => submitComplaint(dummy: false),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(vertical: 18),
+              padding: const EdgeInsets.symmetric(vertical: 17),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isSubmitting
-                      ? [
-                          _primary.withValues(alpha: 0.45),
-                          _violet.withValues(alpha: 0.45),
-                        ]
-                      : [_primary, _violet],
-                ),
-                borderRadius: BorderRadius.circular(17),
+                color: isSubmitting ? const Color(0xFF9E3BB5) : _primary,
+                borderRadius: BorderRadius.circular(14),
                 boxShadow: isSubmitting
                     ? []
                     : [
                         BoxShadow(
-                          color: _primary.withValues(alpha: 0.30),
-                          blurRadius: 24,
-                          spreadRadius: -2,
-                          offset: const Offset(0, 10),
+                          color: _primary.withValues(alpha: 0.22),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
                         ),
                       ],
               ),
               child: Center(
                 child: isSubmitting
-                    ? Row(
+                    ? const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 17,
+                            height: 17,
                             child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2.5),
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
                           ),
                           SizedBox(width: 12),
                           Text(
-                            'SUBMITTING…',
+                            'Submitting…',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ],
                       )
-                    : Row(
+                    : const Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.send_rounded,
-                              color: Colors.white, size: 17),
-                          SizedBox(width: 10),
+                        children: [
+                          Icon(Icons.send_rounded, color: Colors.white, size: 16),
+                          SizedBox(width: 9),
                           Text(
-                            'SUBMIT COMPLAINT',
+                            'Submit Complaint',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.1,
                             ),
                           ),
                         ],
@@ -744,11 +898,10 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        // Confirmation hint
+        const SizedBox(height: 10),
         Center(
           child: Text(
-            'We respond within 24 hours · Ref ID generated on submit',
+            'We respond within 24 hours · Reference ID generated on submit',
             style: TextStyle(
               fontSize: 10,
               color: _inkLight.withValues(alpha: 0.8),
@@ -777,11 +930,9 @@ class _NavBackButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: _primary.withValues(alpha: 0.07),
           borderRadius: BorderRadius.circular(11),
-          border: Border.all(
-              color: _primary.withValues(alpha: 0.12), width: 1),
+          border: Border.all(color: _primary.withValues(alpha: 0.12), width: 1),
         ),
-        child: const Icon(Icons.arrow_back_ios_new_rounded,
-            color: _primary, size: 15),
+        child: const Icon(Icons.arrow_back_ios_new_rounded, color: _primary, size: 15),
       ),
     );
   }
@@ -834,8 +985,7 @@ class _HeaderBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: _green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: _green.withValues(alpha: 0.25), width: 1),
+        border: Border.all(color: _green.withValues(alpha: 0.25), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -843,19 +993,12 @@ class _HeaderBadge extends StatelessWidget {
           Container(
             width: 6,
             height: 6,
-            decoration: const BoxDecoration(
-              color: _green,
-              shape: BoxShape.circle,
-            ),
+            decoration: const BoxDecoration(color: _green, shape: BoxShape.circle),
           ),
           const SizedBox(width: 5),
           const Text(
             'Active',
-            style: TextStyle(
-              fontSize: 10.5,
-              color: _green,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(fontSize: 10.5, color: _green, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -889,7 +1032,6 @@ class _HeroCard extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Decorative circles
           Positioned(
             right: -10,
             top: -20,
@@ -933,17 +1075,13 @@ class _HeroCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Tag
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          width: 1,
-                        ),
+                            color: Colors.white.withValues(alpha: 0.15), width: 1),
                       ),
                       child: const Text(
                         'NEW SUBMISSION',
@@ -967,37 +1105,26 @@ class _HeroCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 15),
-                    // Info chips row
                     Row(
                       children: [
-                        _HeroChip(
-                          icon: Icons.access_time_rounded,
-                          label: '24h response',
-                        ),
+                        _HeroChip(icon: Icons.access_time_rounded, label: '24h response'),
                         const SizedBox(width: 8),
-                        _HeroChip(
-                          icon: Icons.lock_rounded,
-                          label: 'Confidential',
-                        ),
+                        _HeroChip(icon: Icons.lock_rounded, label: 'Confidential'),
                       ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-              // AI badge
               Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.11),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.16),
-                        width: 1,
-                      ),
+                          color: Colors.white.withValues(alpha: 0.16), width: 1),
                     ),
                     child: Column(
                       children: [
@@ -1008,11 +1135,8 @@ class _HeroCard extends StatelessWidget {
                             color: _accent.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(11),
                           ),
-                          child: Icon(
-                            Icons.auto_awesome_rounded,
-                            color: Colors.white.withValues(alpha: 0.95),
-                            size: 20,
-                          ),
+                          child: Icon(Icons.auto_awesome_rounded,
+                              color: Colors.white.withValues(alpha: 0.95), size: 20),
                         ),
                         const SizedBox(height: 8),
                         const Text(
@@ -1062,183 +1186,14 @@ class _HeroChip extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w500,
-          ),
+              color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w500),
         ),
       ],
     );
   }
 }
 
-// ── Attachment helper widgets ─────────────────────────────────────────────────
-
-class _DropZonePrompt extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Dashed border drop zone visual
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20),
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: _primary.withValues(alpha: 0.2),
-              width: 1.5,
-              // Dashed via CustomPainter would be ideal; border approximation:
-            ),
-            color: _primary.withValues(alpha: 0.025),
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      _primary.withValues(alpha: 0.12),
-                      _accent.withValues(alpha: 0.10),
-                    ],
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.cloud_upload_outlined,
-                  size: 24,
-                  color: _primary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Tap to upload a file',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _inkDark,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Screenshots, photos, or documents\nthat support your complaint',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: _inkLight.withValues(alpha: 0.9),
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _AttachedFilePreview extends StatelessWidget {
-  final String fileName;
-  const _AttachedFilePreview({required this.fileName});
-
-  IconData _iconForFile(String name) {
-    final ext = name.split('.').last.toLowerCase();
-    if (ext == 'pdf') return Icons.picture_as_pdf_outlined;
-    if (ext == 'doc' || ext == 'docx') return Icons.description_outlined;
-    if (ext == 'jpg' || ext == 'jpeg' || ext == 'png') return Icons.image_outlined;
-    return Icons.insert_drive_file_outlined;
-  }
-
-  Color _colorForFile(String name) {
-    final ext = name.split('.').last.toLowerCase();
-    if (ext == 'pdf') return const Color(0xFFE53935);
-    if (ext == 'doc' || ext == 'docx') return const Color(0xFF1565C0);
-    if (ext == 'jpg' || ext == 'jpeg' || ext == 'png') return const Color(0xFF00897B);
-    return _primary;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fileColor = _colorForFile(fileName);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: _green.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _green.withValues(alpha: 0.25),
-            width: 1.2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: fileColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(_iconForFile(fileName),
-                  color: fileColor, size: 22),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fileName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: _inkDark,
-                      letterSpacing: -0.2,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: _green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      const Text(
-                        'Ready to submit',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: _green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.check_circle_rounded,
-                color: _green, size: 22),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// ── Format chip ───────────────────────────────────────────────────────────────
 
 class _FormatChip extends StatelessWidget {
   final IconData icon;
@@ -1261,10 +1216,7 @@ class _FormatChip extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 9.5,
-              color: _inkMid,
-              fontWeight: FontWeight.w600,
-            ),
+                fontSize: 9.5, color: _inkMid, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -1275,11 +1227,11 @@ class _FormatChip extends StatelessWidget {
 // ── Category metadata ─────────────────────────────────────────────────────────
 
 class _CategoryMeta {
-  final String label;
-  final String subtitle;
+  final String   label;
+  final String   subtitle;
   final IconData icon;
-  final Color accent;
-  final Color bg;
+  final Color    accent;
+  final Color    bg;
   const _CategoryMeta({
     required this.label,
     required this.subtitle,
@@ -1293,8 +1245,8 @@ class _CategoryMeta {
 
 class _CategoryTile extends StatefulWidget {
   final _CategoryMeta meta;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final bool          isSelected;
+  final VoidCallback  onTap;
 
   const _CategoryTile({
     required this.meta,
@@ -1355,8 +1307,7 @@ class _CategoryTileState extends State<_CategoryTile> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: m.accent
-                          .withValues(alpha: sel ? 0.18 : 0.09),
+                      color: m.accent.withValues(alpha: sel ? 0.18 : 0.09),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(m.icon, color: m.accent, size: 18),
@@ -1372,8 +1323,7 @@ class _CategoryTileState extends State<_CategoryTile> {
                         decoration: BoxDecoration(
                           color: m.accent,
                           shape: BoxShape.circle,
-                          border:
-                              Border.all(color: _cardBg, width: 2),
+                          border: Border.all(color: _cardBg, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: m.accent.withValues(alpha: 0.3),
@@ -1382,8 +1332,7 @@ class _CategoryTileState extends State<_CategoryTile> {
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.check_rounded,
-                            size: 7, color: Colors.white),
+                        child: const Icon(Icons.check_rounded, size: 7, color: Colors.white),
                       ),
                     ),
                 ],
@@ -1401,11 +1350,7 @@ class _CategoryTileState extends State<_CategoryTile> {
               const SizedBox(height: 2),
               Text(
                 m.subtitle,
-                style: const TextStyle(
-                  fontSize: 9.5,
-                  color: _inkLight,
-                  height: 1.35,
-                ),
+                style: const TextStyle(fontSize: 9.5, color: _inkLight, height: 1.35),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

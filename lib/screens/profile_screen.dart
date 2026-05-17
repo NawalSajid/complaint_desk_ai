@@ -2,13 +2,13 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:complaint_desk_ai/screens/login_screen.dart';
 import 'package:complaint_desk_ai/screens/rolebased_screen.dart';
 import 'package:complaint_desk_ai/screens/home_screen.dart';
 import 'package:complaint_desk_ai/screens/complaints_screen.dart';
 import 'package:complaint_desk_ai/screens/track_complaints_screen.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:math' as math;
 import '../constants.dart';
 
@@ -282,7 +282,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         const SizedBox(width: 12),
         Expanded(child: Text(message, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5))),
       ]),
-      backgroundColor: success ? _green : _red,
+      backgroundColor: success ? const Color.fromARGB(255, 56, 31, 67) : _red,
       behavior: SnackBarBehavior.floating,
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 20),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -332,7 +332,27 @@ class _ProfileScreenState extends State<ProfileScreen>
         TextButton(onPressed: () => Navigator.pop(context), style: TextButton.styleFrom(foregroundColor: _inkMid),
           child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600))),
         const SizedBox(width: 8),
-        _GradientButton(label: 'Submit', onTap: () { Navigator.pop(context); _showSnackBar('Thank you for your feedback!'); }),
+        _GradientButton(label: 'Submit', onTap: () async {
+          final msg = ctrl.text.trim();
+          if (msg.isEmpty) {
+            _showSnackBar('Please enter feedback before submitting', success: false);
+            return;
+          }
+          try {
+            final res = await http.post(
+              Uri.parse('$baseUrl/api/feedback'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'user_id': widget.userId, 'message': msg}),
+            );
+            if (mounted) Navigator.pop(context);
+            _showSnackBar(
+              res.statusCode == 201 ? 'Thank you for your feedback!' : 'Failed to submit feedback',
+              success: res.statusCode == 201,
+            );
+          } catch (_) {
+            _showSnackBar('Error connecting to server', success: false);
+          }
+        }),
       ]),
     ));
   }

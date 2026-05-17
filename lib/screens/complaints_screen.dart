@@ -8,11 +8,26 @@ import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../constants.dart';
 
-// ── Theme constants (matches HomeScreen / RoleSelectionScreen) ────────────────
-const Color _primary = Color.fromRGBO(156, 39, 176, 1);   // purple
-const Color _accent  = Color.fromRGBO(0, 188, 212, 1);    // cyan
+// ── Theme constants ───────────────────────────────────────────────────────────
+const Color _primary = Color.fromRGBO(156, 39, 176, 1);
+const Color _accent  = Color.fromRGBO(0, 188, 212, 1);
+const Color _gradMid = Color(0xFF5C6BC0);
 const Color _surface = Color(0xFFF7F7FB);
 const Color _cardBg  = Colors.white;
+
+const LinearGradient _grad = LinearGradient(
+  colors: [_primary, _gradMid, _accent],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+// ── Gradient helpers ──────────────────────────────────────────────────────────
+
+Widget _gradMask({required Widget child}) => ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (b) => _grad.createShader(b),
+      child: child,
+    );
 
 class ComplaintsScreen extends StatefulWidget {
   final String userId;
@@ -61,9 +76,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        setState(() {
-          complaints = data;
-        });
+        setState(() => complaints = data);
       } else {
         debugPrint('Failed to fetch complaints: ${response.statusCode}');
         showMessage('Failed to load complaints');
@@ -112,9 +125,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ── Add complaint button ───────────────────────────
                       _buildAddButton(),
-
                       const SizedBox(height: 28),
 
                       // ── Section header ────────────────────────────────
@@ -249,20 +260,29 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              // Title
+
+              // ── Gradient title ─────────────────────────────────────────
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'My Complaints',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
-                      letterSpacing: -0.4,
+                children: [
+                  ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [_primary, _accent],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      'My Complaints',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white, // masked by shader
+                        letterSpacing: -0.4,
+                      ),
                     ),
                   ),
-                  Text(
+                  const Text(
                     'Manage your submissions',
                     style: TextStyle(
                       fontSize: 11,
@@ -271,7 +291,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                   ),
                 ],
               ),
+
               const Spacer(),
+
               // Complaint count badge
               Container(
                 padding:
@@ -308,13 +330,10 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
         bool? added = await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                NewComplaintScreen(userId: widget.userId),
+            builder: (context) => NewComplaintScreen(userId: widget.userId),
           ),
         );
-        if (added == true) {
-          fetchComplaints();
-        }
+        if (added == true) fetchComplaints();
       },
       child: Container(
         width: double.infinity,
@@ -344,19 +363,18 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                 color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.add_rounded,
-                  color: Colors.white, size: 18),
+              child: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
             ),
             const SizedBox(width: 10),
-                   Text(
-                      'Submit New Complaint',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        letterSpacing: 0.1,
-                      ),
-                    ),
+            const Text(
+              'Submit New Complaint',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                letterSpacing: 0.1,
+              ),
+            ),
           ],
         ),
       ),
@@ -374,7 +392,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
     String time,
     String updates,
   ) {
-    final statusColor = _statusColor(status);
+    final statusColor   = _statusColor(status);
     final priorityColor = _priorityColor(priority);
 
     return Container(
@@ -394,7 +412,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Card top: category strip + status ──────────────────────────
+          // Card top
           Container(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
             decoration: BoxDecoration(
@@ -402,13 +420,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(18)),
               border: Border(
-                bottom:
-                    BorderSide(color: _primary.withValues(alpha: 0.06), width: 1),
+                bottom: BorderSide(
+                    color: _primary.withValues(alpha: 0.06), width: 1),
               ),
             ),
             child: Row(
               children: [
-                // Category icon
                 Container(
                   width: 32,
                   height: 32,
@@ -420,11 +437,8 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                     ),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Icon(
-                    _categoryIcon(category),
-                    color: Colors.white,
-                    size: 16,
-                  ),
+                  child: Icon(_categoryIcon(category),
+                      color: Colors.white, size: 16),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -438,10 +452,9 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                     ),
                   ),
                 ),
-                // Status badge
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -455,18 +468,15 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                         width: 5,
                         height: 5,
                         decoration: BoxDecoration(
-                          color: statusColor,
-                          shape: BoxShape.circle,
-                        ),
+                            color: statusColor, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 5),
                       Text(
                         status,
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: statusColor,
-                        ),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: statusColor),
                       ),
                     ],
                   ),
@@ -475,13 +485,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
             ),
           ),
 
-          // ── Card body ──────────────────────────────────────────────────
+          // Card body
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Description
                 Text(
                   description,
                   maxLines: 2,
@@ -492,56 +501,36 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                     height: 1.5,
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
-                // Priority + Category tags
                 Row(
                   children: [
                     _buildTag(priority, priorityColor),
                     const SizedBox(width: 8),
                     _buildTag(category, _accent),
                     const Spacer(),
-                    // Updates chip
                     Row(
                       children: [
-                        Icon(Icons.chat_bubble_outline_rounded,
-                            size: 12,
-                            color: const Color(0xFFB0B0C0)),
+                        const Icon(Icons.chat_bubble_outline_rounded,
+                            size: 12, color: Color(0xFFB0B0C0)),
                         const SizedBox(width: 4),
-                        Text(
-                          updates,
-                          style: const TextStyle(
-                              fontSize: 10.5, color: Color(0xFFB0B0C0)),
-                        ),
+                        Text(updates,
+                            style: const TextStyle(
+                                fontSize: 10.5, color: Color(0xFFB0B0C0))),
                       ],
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
-
-                // Divider
-                Container(
-                  height: 1,
-                  color: const Color(0xFFF0F0F5),
-                ),
-
+                Container(height: 1, color: const Color(0xFFF0F0F5)),
                 const SizedBox(height: 10),
-
-                // Time
                 Row(
                   children: [
-                    Icon(Icons.access_time_rounded,
-                        size: 12,
-                        color: const Color(0xFFB0B0C0)),
+                    const Icon(Icons.access_time_rounded,
+                        size: 12, color: Color(0xFFB0B0C0)),
                     const SizedBox(width: 5),
-                    Text(
-                      time,
-                      style: const TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFFB0B0C0)),
-                    ),
+                    Text(time,
+                        style: const TextStyle(
+                            fontSize: 10.5, color: Color(0xFFB0B0C0))),
                   ],
                 ),
               ],
@@ -565,10 +554,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: color,
-        ),
+            fontSize: 10, fontWeight: FontWeight.w700, color: color),
       ),
     );
   }
@@ -588,10 +574,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
             border: Border.all(color: const Color(0xFFEEEEF5)),
           ),
           child: const Center(
-            child: CircularProgressIndicator(
-              color: _primary,
-              strokeWidth: 2,
-            ),
+            child: CircularProgressIndicator(color: _primary, strokeWidth: 2),
           ),
         ),
       ),
@@ -613,28 +596,20 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                 color: _primary.withValues(alpha: 0.07),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.inbox_outlined,
-                size: 30,
-                color: _primary,
-              ),
+              child: const Icon(Icons.inbox_outlined, size: 30, color: _primary),
             ),
             const SizedBox(height: 14),
             const Text(
               'No complaints yet',
               style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF1A1A2E),
-              ),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1A1A2E)),
             ),
             const SizedBox(height: 6),
             const Text(
               'Tap the button above to submit one',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF9090A0),
-              ),
+              style: TextStyle(fontSize: 12, color: Color(0xFF9090A0)),
             ),
           ],
         ),
@@ -642,87 +617,105 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
     );
   }
 
-  // ── Bottom Nav ────────────────────────────────────────────────────────────
+  // ── Bottom Nav (matches profile_screen gradient style) ────────────────────
 
   Widget _buildBottomNav() {
-    final items = [
-      _NavData('Home', Icons.home_outlined, Icons.home_rounded),
+    const tabs = [
+      _NavData('Home',       Icons.home_outlined,              Icons.home_rounded),
       _NavData('Complaints', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded),
-      _NavData('Track', Icons.track_changes_outlined, Icons.track_changes_rounded),
-      _NavData('Profile', Icons.person_outline_rounded, Icons.person_rounded),
+      _NavData('Track',      Icons.track_changes_outlined,      Icons.track_changes_rounded),
+      _NavData('Profile',    Icons.person_outline_rounded,      Icons.person_rounded),
     ];
-
     const activeIndex = 1;
 
+    void onTap(int i) {
+      if (i == activeIndex) return;
+      final routes = <Widget Function()>[
+        () => HomeScreen(userId: widget.userId),
+        () => ComplaintsScreen(userId: widget.userId),
+        () => TrackComplaintsScreen(userId: widget.userId),
+        () => ProfileScreen(userId: widget.userId),
+      ];
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (_) => routes[i]()));
+    }
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFEEEEF5), width: 1),
-        ),
+        border: const Border(top: BorderSide(color: Color(0xFFEEEEF5), width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       child: SafeArea(
         top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(items.length, (i) {
+          children: List.generate(tabs.length, (i) {
             final isActive = i == activeIndex;
-            final item = items[i];
-
-            void onTap() {
-              if (i == 0) {
-                Navigator.pushReplacement(context,
-                    MaterialPageRoute(
-                        builder: (_) => HomeScreen(userId: widget.userId)));
-              } else if (i == 1) {
-                // already here
-              } else if (i == 2) {
-                Navigator.pushReplacement(context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            TrackComplaintsScreen(userId: widget.userId)));
-              } else if (i == 3) {
-                Navigator.pushReplacement(context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            ProfileScreen(userId: widget.userId)));
-              }
-            }
+            final tab      = tabs[i];
 
             return GestureDetector(
-              onTap: onTap,
+              onTap: () => onTap(i),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? _primary.withValues(alpha: 0.08)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: isActive
+                    ? BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _primary.withValues(alpha: 0.10),
+                            _accent.withValues(alpha: 0.07),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: _primary.withValues(alpha: 0.18), width: 1),
+                      )
+                    : const BoxDecoration(
+                        borderRadius:
+                            BorderRadius.all(Radius.circular(14))),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isActive ? item.activeIcon : item.icon,
-                      size: 22,
-                      color: isActive ? _primary : const Color(0xFFAAAAAC),
-                    ),
+                    isActive
+                        ? _gradMask(
+                            child: Icon(tab.activeIcon,
+                                size: 22, color: Colors.white))
+                        : Icon(tab.icon,
+                            size: 22, color: const Color(0xFFABABCC)),
                     const SizedBox(height: 3),
-                    Text(
-                      item.label.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: isActive
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color:
-                            isActive ? _primary : const Color(0xFFAAAAAC),
-                        letterSpacing: 0.3,
-                      ),
-                    ),
+                    isActive
+                        ? _gradMask(
+                            child: Text(
+                              tab.label.toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            tab.label.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFABABCC),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                   ],
                 ),
               ),
@@ -737,51 +730,37 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
 
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'pending':
-        return const Color(0xFFE67E22);
-      case 'resolved':
-        return const Color(0xFF0BAB64);
-      case 'rejected':
-        return const Color(0xFFE84393);
+      case 'pending':     return const Color(0xFFE67E22);
+      case 'resolved':    return const Color(0xFF0BAB64);
+      case 'rejected':    return const Color(0xFFE84393);
       case 'in progress':
-      case 'inprogress':
-        return const Color(0xFF2979FF);
-      default:
-        return _primary;
+      case 'inprogress':  return const Color(0xFF2979FF);
+      default:            return _primary;
     }
   }
 
   Color _priorityColor(String priority) {
     switch (priority.toLowerCase()) {
-      case 'high':
-        return const Color(0xFFE84393);
-      case 'medium':
-        return const Color(0xFFE67E22);
-      case 'low':
-        return const Color(0xFF0BAB64);
-      default:
-        return _accent;
+      case 'high':   return const Color(0xFFE84393);
+      case 'medium': return const Color(0xFFE67E22);
+      case 'low':    return const Color(0xFF0BAB64);
+      default:       return _accent;
     }
   }
 
   IconData _categoryIcon(String category) {
     switch (category.toLowerCase()) {
-      case 'academic':
-        return Icons.school_outlined;
-      case 'hostel':
-        return Icons.apartment_outlined;
-      case 'transport':
-        return Icons.directions_bus_outlined;
-      case 'harassment':
-        return Icons.shield_outlined;
-      default:
-        return Icons.chat_bubble_outline_rounded;
+      case 'academic':   return Icons.school_outlined;
+      case 'hostel':     return Icons.apartment_outlined;
+      case 'transport':  return Icons.directions_bus_outlined;
+      case 'harassment': return Icons.shield_outlined;
+      default:           return Icons.chat_bubble_outline_rounded;
     }
   }
 }
 
 class _NavData {
-  final String label;
+  final String   label;
   final IconData icon;
   final IconData activeIcon;
   const _NavData(this.label, this.icon, this.activeIcon);

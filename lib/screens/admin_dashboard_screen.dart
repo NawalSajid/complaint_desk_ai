@@ -47,7 +47,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     {
       'id': '#C-1041',
       'title': 'Hostel water supply issue',
-      'dept': 'Facilities',
+      'dept': 'Hostel',
       'status': 'Pending',
       'priority': 'High',
       'time': '2h ago',
@@ -55,7 +55,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     {
       'id': '#C-1040',
       'title': 'Library AC not working',
-      'dept': 'Maintenance',
+      'dept': 'General',
       'status': 'In Progress',
       'priority': 'Medium',
       'time': '4h ago',
@@ -63,7 +63,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     {
       'id': '#C-1039',
       'title': 'Parking area lights broken',
-      'dept': 'Security',
+      'dept': 'General',
       'status': 'Pending',
       'priority': 'Low',
       'time': '6h ago',
@@ -71,7 +71,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     {
       'id': '#C-1038',
       'title': 'IT lab projector fault',
-      'dept': 'IT Dept',
+      'dept': 'Academic',
       'status': 'Resolved',
       'priority': 'High',
       'time': '1d ago',
@@ -303,7 +303,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       ),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  // FIX: reduced from 14 → 7 to eliminate the 7px overflow
+                  const SizedBox(height: 7),
                   const Text(
                     'Dashboard',
                     style: TextStyle(
@@ -317,7 +318,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   const Text(
                     'Welcome, Admin',
                     style: TextStyle(
-                      color: Colors.white60,
+                      color: Colors.white,
                       fontSize: 12.5,
                     ),
                   ),

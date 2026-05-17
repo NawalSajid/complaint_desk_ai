@@ -69,6 +69,48 @@ db.connect(err => {
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
+
+    // Store user feedback
+    db.query(`
+      CREATE TABLE IF NOT EXISTS feedback (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Store admin remarks per complaint status update
+    db.query(`
+      CREATE TABLE IF NOT EXISTS complaint_remarks (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        complaint_id INT NOT NULL,
+        admin_remark TEXT,
+        status VARCHAR(50) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (complaint_id) REFERENCES complaints(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Persist admin settings
+    db.query(`
+      CREATE TABLE IF NOT EXISTS admin_settings (
+        id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        email_notifications TINYINT(1) NOT NULL DEFAULT 1,
+        push_notifications TINYINT(1) NOT NULL DEFAULT 1,
+        high_priority_alerts TINYINT(1) NOT NULL DEFAULT 1,
+        auto_assign TINYINT(1) NOT NULL DEFAULT 0,
+        resolution_deadline_hours INT NOT NULL DEFAULT 48,
+        updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    db.query(
+      `INSERT INTO admin_settings (id, email_notifications, push_notifications, high_priority_alerts, auto_assign, resolution_deadline_hours)
+       SELECT 1, 1, 1, 1, 0, 48
+       WHERE NOT EXISTS (SELECT 1 FROM admin_settings WHERE id = 1)`
+    );
   }
 });
 
@@ -260,11 +302,211 @@ app.get('/api/complaints', (req, res) => {
   );
 });
 
+// USER FEEDBACK API
+app.post('/api/feedback', (req, res) => {
+  const userId = parseInt(req.body.user_id);
+  const message = (req.body.message || '').toString().trim();
+
+  if (isNaN(userId)) return res.status(400).json({ message: 'Invalid user ID' });
+  if (!message) return res.status(400).json({ message: 'Feedback message is required' });
+
+  db.query(
+    'INSERT INTO feedback (user_id, message) VALUES (?, ?)',
+    [userId, message],
+    (err, result) => {
+      if (err) {
+        console.error('❌ Feedback insert error:', err);
+        return res.status(500).json({ message: 'Database error' });
+      }
+      res.status(201).json({ message: 'Feedback submitted', id: result.insertId });
+    }
+  );
+});
+
+// ADMIN OVERVIEW API
+app.get('/api/admin/overview', (req, res) => {
+  const overviewQuery = `
+    SELECT
+      (SELECT COUNT(*) FROM complaints) AS total_complaints,
+      (SELECT COUNT(*) FROM complaints WHERE status = 'Pending' OR status = 'New') AS pending_complaints,
+      (SELECT COUNT(*) FROM complaints WHERE status = 'In Progress' OR status = 'In-Progress' OR status = 'in_progress') AS in_progress_complaints,
+      (SELECT COUNT(*) FROM complaints WHERE status = 'Resolved') AS resolved_complaints,
+      (SELECT COUNT(*) FROM users WHERE role = 'user') AS total_users
+  `;
+
+  db.query(overviewQuery, (err, results) => {
+    if (err) {
+      console.error('❌ Admin overview error:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    const row = results[0] || {};
+    res.json({
+      total_complaints: row.total_complaints || 0,
+      pending_complaints: row.pending_complaints || 0,
+      in_progress_complaints: row.in_progress_complaints || 0,
+      resolved_complaints: row.resolved_complaints || 0,
+      total_users: row.total_users || 0,
+    });
+  });
+});
+
+// ADMIN GET ALL COMPLAINTS API
+app.get('/api/admin/complaints', (req, res) => {
+  const query = `
+    SELECT
+      c.id,
+      c.user_id,
+      c.category,
+      c.description,
+      c.document,
+      c.status,
+      c.priority,
+      c.created_at,
+      u.name AS user_name,
+      u.email AS user_email
+    FROM complaints c
+    JOIN users u ON u.id = c.user_id
+    ORDER BY c.created_at DESC
+  `;
+
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error('❌ Admin complaints fetch error:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    res.json(results.map(c => ({
+      id: c.id,
+      user_id: c.user_id,
+      user_name: c.user_name,
+      user_email: c.user_email,
+      category: c.category,
+      description: c.description,
+      document: c.document,
+      status: c.status,
+      priority: c.priority,
+      created_at: c.created_at,
+    })));
+  });
+});
+
+// ADMIN UPDATE COMPLAINT STATUS API
+app.put('/api/admin/complaints/:id/status', (req, res) => {
+  const complaintId = parseInt(req.params.id);
+  const { status, admin_remark } = req.body;
+
+  if (isNaN(complaintId)) {
+    return res.status(400).json({ message: 'Invalid complaint ID' });
+  }
+
+  const allowedStatuses = ['Pending', 'In Progress', 'Resolved', 'New'];
+  if (!status || !allowedStatuses.includes(status)) {
+    return res.status(400).json({ message: 'Invalid status' });
+  }
+
+  db.query('UPDATE complaints SET status = ? WHERE id = ?', [status, complaintId], (err, result) => {
+    if (err) {
+      console.error('❌ Admin status update error:', err);
+      return res.status(500).json({ message: 'Database error' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Complaint not found' });
+    }
+
+    db.query(
+      'INSERT INTO complaint_remarks (complaint_id, admin_remark, status) VALUES (?, ?, ?)',
+      [complaintId, (admin_remark || '').toString().trim(), status],
+      (remarkErr) => {
+        if (remarkErr) {
+          console.error('❌ Admin remark insert error:', remarkErr);
+          return res.status(500).json({ message: 'Status updated but remark save failed' });
+        }
+        res.json({ message: 'Complaint status updated successfully' });
+      }
+    );
+  });
+});
+
+// ADMIN SETTINGS APIs
+app.get('/api/admin/settings', (req, res) => {
+  db.query('SELECT * FROM admin_settings WHERE id = 1', (err, results) => {
+    if (err) return res.status(500).json({ message: 'Database error' });
+    const s = results[0] || {};
+    res.json({
+      email_notifications: !!s.email_notifications,
+      push_notifications: !!s.push_notifications,
+      high_priority_alerts: !!s.high_priority_alerts,
+      auto_assign: !!s.auto_assign,
+      resolution_deadline_hours: s.resolution_deadline_hours || 48,
+    });
+  });
+});
+
+app.put('/api/admin/settings', (req, res) => {
+  const email = req.body.email_notifications ? 1 : 0;
+  const push = req.body.push_notifications ? 1 : 0;
+  const high = req.body.high_priority_alerts ? 1 : 0;
+  const auto = req.body.auto_assign ? 1 : 0;
+  const deadline = parseInt(req.body.resolution_deadline_hours) || 48;
+
+  db.query(
+    `UPDATE admin_settings
+     SET email_notifications = ?, push_notifications = ?, high_priority_alerts = ?, auto_assign = ?, resolution_deadline_hours = ?
+     WHERE id = 1`,
+    [email, push, high, auto, deadline],
+    (err) => {
+      if (err) return res.status(500).json({ message: 'Database error' });
+      res.json({ message: 'Settings updated successfully' });
+    }
+  );
+});
+
+app.get('/api/admin/export/complaints.csv', (req, res) => {
+  const query = `
+    SELECT c.id, u.name AS user_name, u.email AS user_email, c.category, c.description, c.status, c.priority, c.created_at
+    FROM complaints c
+    JOIN users u ON u.id = c.user_id
+    ORDER BY c.created_at DESC
+  `;
+  db.query(query, (err, results) => {
+    if (err) return res.status(500).json({ message: 'Database error' });
+
+    const header = 'id,user_name,user_email,category,description,status,priority,created_at';
+    const rows = results.map(r => [
+      r.id,
+      `"${String(r.user_name || '').replace(/"/g, '""')}"`,
+      `"${String(r.user_email || '').replace(/"/g, '""')}"`,
+      `"${String(r.category || '').replace(/"/g, '""')}"`,
+      `"${String(r.description || '').replace(/"/g, '""')}"`,
+      `"${String(r.status || '').replace(/"/g, '""')}"`,
+      `"${String(r.priority || '').replace(/"/g, '""')}"`,
+      `"${String(r.created_at || '').replace(/"/g, '""')}"`,
+    ].join(','));
+
+    const csv = [header, ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="complaints_export.csv"');
+    res.send(csv);
+  });
+});
+
+app.delete('/api/admin/complaints', (req, res) => {
+  db.query('DELETE FROM complaints', (err) => {
+    if (err) return res.status(500).json({ message: 'Database error' });
+    res.json({ message: 'All complaints reset successfully' });
+  });
+});
+
 // Start Server
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+
+
+
 
 
 

@@ -8,11 +8,26 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../constants.dart';
 
-// ── Theme constants (matches ComplaintsScreen / HomeScreen) ───────────────────
-const Color _primary = Color.fromRGBO(156, 39, 176, 1);  // purple
-const Color _accent  = Color.fromRGBO(0, 188, 212, 1);   // cyan
-const Color _surface = Color(0xFFF7F7FB);
-const Color _cardBg  = Colors.white;
+// ── Theme constants ───────────────────────────────────────────────────────────
+const Color _primary  = Color.fromRGBO(156, 39, 176, 1);
+const Color _accent   = Color.fromRGBO(0, 188, 212, 1);
+const Color _gradMid  = Color(0xFF5C6BC0);
+const Color _surface  = Color(0xFFF7F7FB);
+const Color _cardBg   = Colors.white;
+
+const LinearGradient _grad = LinearGradient(
+  colors: [_primary, _gradMid, _accent],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+// ── Gradient helpers ──────────────────────────────────────────────────────────
+
+Widget _gradMask({required Widget child}) => ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: (b) => _grad.createShader(b),
+      child: child,
+    );
 
 class TrackComplaintsScreen extends StatefulWidget {
   final String userId;
@@ -25,14 +40,14 @@ class TrackComplaintsScreen extends StatefulWidget {
 
 class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     with SingleTickerProviderStateMixin {
-  int total = 0;
-  int pending = 0;
+  int total      = 0;
+  int pending    = 0;
   int inProgress = 0;
-  int resolved = 0;
+  int resolved   = 0;
   bool isLoading = true;
 
   late AnimationController _controller;
-  late Animation<double> _fadeAnim;
+  late Animation<double>   _fadeAnim;
 
   @override
   void initState() {
@@ -61,15 +76,15 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
 
       if (response.statusCode == 200) {
         final List complaints = jsonDecode(response.body);
-
         setState(() {
-          total = complaints.length;
-          pending = complaints.where((c) =>
+          total      = complaints.length;
+          pending    = complaints.where((c) =>
               c['status'] == 'New' || c['status'] == 'Pending').length;
-          inProgress =
-              complaints.where((c) => c['status'] == 'In-Progress').length;
-          resolved =
-              complaints.where((c) => c['status'] == 'Resolved').length;
+          inProgress = complaints.where((c) =>
+              c['status'] == 'In-Progress' ||
+              c['status'] == 'In Progress'  ||
+              c['status'] == 'in_progress').length;
+          resolved   = complaints.where((c) => c['status'] == 'Resolved').length;
         });
       }
     } catch (e) {
@@ -89,14 +104,14 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     return Scaffold(
       backgroundColor: _surface,
       body: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: isLoading
-                  ? _buildLoadingState()
-                  : FadeTransition(
-                      opacity: _fadeAnim,
-                      child: RefreshIndicator(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: isLoading
+                ? _buildLoadingState()
+                : FadeTransition(
+                    opacity: _fadeAnim,
+                    child: RefreshIndicator(
                       color: _primary,
                       onRefresh: () async {
                         setState(() => isLoading = true);
@@ -146,10 +161,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                         ),
                       ),
                     ),
-                    ),
-            ),
-          ],
-        ),
+                  ),
+          ),
+        ],
+      ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
@@ -160,9 +175,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     return Container(
       decoration: const BoxDecoration(
         color: _cardBg,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFEEEEF5), width: 1),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFEEEEF5), width: 1)),
       ),
       child: SafeArea(
         bottom: false,
@@ -193,29 +206,37 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              // Title
-              const Column(
+
+              // ── Gradient title ─────────────────────────────────────────
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Track Complaints',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF1A1A2E),
-                      letterSpacing: -0.4,
+                  ShaderMask(
+                    blendMode: BlendMode.srcIn,
+                    shaderCallback: (bounds) => const LinearGradient(
+                      colors: [_primary, _accent],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ).createShader(bounds),
+                    child: const Text(
+                      'Track Complaints',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
                     ),
                   ),
-                  Text(
+                  const Text(
                     'Monitor your complaint status',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF9090A0),
-                    ),
+                    style: TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
                   ),
                 ],
               ),
+
               const Spacer(),
+
               // Refresh button
               GestureDetector(
                 onTap: () async {
@@ -229,11 +250,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                     color: _primary.withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(
-                    Icons.refresh_rounded,
-                    size: 18,
-                    color: _primary,
-                  ),
+                  child: const Icon(Icons.refresh_rounded, size: 18, color: _primary),
                 ),
               ),
             ],
@@ -274,7 +291,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     );
   }
 
-  // ── Banner ────────────────────────────────────────────────────────────────
+  // ── Banner (purple → cyan gradient) ───────────────────────────────────────
 
   Widget _buildBanner() {
     return Container(
@@ -284,94 +301,123 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [_primary, Color.fromRGBO(123, 82, 232, 1)],
+          colors: [_primary, _gradMid, _accent],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: _primary.withValues(alpha: 0.30),
+            color: _primary.withValues(alpha: 0.28),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.bar_chart_rounded,
-                          color: Colors.white, size: 13),
-                      SizedBox(width: 5),
-                      Text(
-                        'OVERVIEW',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  total.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 48,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Total Complaints',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Decorative circle
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.track_changes_rounded,
-                  color: Colors.white,
-                  size: 26,
-                ),
+          // Decorative circles
+          Positioned(
+            right: -16,
+            top: -16,
+            child: Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.06),
               ),
             ),
+          ),
+          Positioned(
+            right: 20,
+            bottom: -20,
+            child: Container(
+              width: 55,
+              height: 55,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.05),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.2), width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.bar_chart_rounded, color: Colors.white, size: 13),
+                          SizedBox(width: 5),
+                          Text(
+                            'OVERVIEW',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      total.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -1,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Total Complaints',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Icon badge
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.track_changes_rounded,
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -439,9 +485,9 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
 
   Widget _buildProgressRow({
     required String label,
-    required int count,
+    required int    count,
     required double percentage,
-    required Color color,
+    required Color  color,
   }) {
     final pct = (percentage * 100).toStringAsFixed(0);
     return Column(
@@ -455,10 +501,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -511,10 +554,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
   // ── Stat Card ─────────────────────────────────────────────────────────────
 
   Widget _buildStatCard({
-    required String count,
-    required String title,
-    required String subtitle,
-    required Color color,
+    required String  count,
+    required String  title,
+    required String  subtitle,
+    required Color   color,
     required IconData icon,
     double value = 0,
   }) {
@@ -535,7 +578,6 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon
           Container(
             width: 36,
             height: 36,
@@ -546,7 +588,6 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(height: 14),
-          // Count
           Text(
             count,
             style: TextStyle(
@@ -558,7 +599,6 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             ),
           ),
           const SizedBox(height: 4),
-          // Title
           Text(
             title,
             style: const TextStyle(
@@ -569,16 +609,11 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             ),
           ),
           const SizedBox(height: 2),
-          // Subtitle
           Text(
             subtitle,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF9090A0),
-            ),
+            style: const TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
           ),
           const SizedBox(height: 12),
-          // Mini progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
@@ -614,7 +649,6 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
       ),
       child: Row(
         children: [
-          // Icon
           Container(
             width: 48,
             height: 48,
@@ -626,18 +660,15 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
               ),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
-              Icons.check_circle_outline_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
+            child: const Icon(Icons.check_circle_outline_rounded,
+                color: Colors.white, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
+              children: const [
+                Text(
                   'Resolved',
                   style: TextStyle(
                     fontSize: 13,
@@ -646,13 +677,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   'Successfully closed complaints',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: const Color(0xFF9090A0),
-                  ),
+                  style: TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
                 ),
               ],
             ),
@@ -692,16 +720,13 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(
-            color: _primary,
-            strokeWidth: 2.5,
-          ),
+          const CircularProgressIndicator(color: _primary, strokeWidth: 2.5),
           const SizedBox(height: 14),
-          Text(
+          const Text(
             'Loading statistics…',
             style: TextStyle(
               fontSize: 13,
-              color: const Color(0xFF9090A0),
+              color: Color(0xFF9090A0),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -710,94 +735,103 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     );
   }
 
-  // ── Bottom Nav ────────────────────────────────────────────────────────────
+  // ── Bottom Nav (matches profile_screen gradient style) ────────────────────
 
   Widget _buildBottomNav() {
-    final items = [
-      _NavData('Home', Icons.home_outlined, Icons.home_rounded),
-      _NavData('Complaints', Icons.chat_bubble_outline_rounded,
-          Icons.chat_bubble_rounded),
-      _NavData('Track', Icons.track_changes_outlined,
-          Icons.track_changes_rounded),
-      _NavData('Profile', Icons.person_outline_rounded,
-          Icons.person_rounded),
+    const tabs = [
+      _NavData('Home',       Icons.home_outlined,              Icons.home_rounded),
+      _NavData('Complaints', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded),
+      _NavData('Track',      Icons.track_changes_outlined,      Icons.track_changes_rounded),
+      _NavData('Profile',    Icons.person_outline_rounded,      Icons.person_rounded),
     ];
-
     const activeIndex = 2;
 
+    void onTap(int i) {
+      if (i == activeIndex) return;
+      final routes = <Widget Function()>[
+        () => HomeScreen(userId: widget.userId),
+        () => ComplaintsScreen(userId: widget.userId),
+        () => TrackComplaintsScreen(userId: widget.userId),
+        () => ProfileScreen(userId: widget.userId),
+      ];
+      Navigator.pushReplacement(
+          context, MaterialPageRoute(builder: (_) => routes[i]()));
+    }
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Color(0xFFEEEEF5), width: 1),
-        ),
+        border: const Border(top: BorderSide(color: Color(0xFFEEEEF5), width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
       ),
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
       child: SafeArea(
         top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(items.length, (i) {
+          children: List.generate(tabs.length, (i) {
             final isActive = i == activeIndex;
-            final item = items[i];
-
-            void onTap() {
-              if (i == 0) {
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => HomeScreen(userId: widget.userId)));
-              } else if (i == 1) {
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            ComplaintsScreen(userId: widget.userId)));
-              } else if (i == 2) {
-                // already here
-              } else if (i == 3) {
-                Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) =>
-                            ProfileScreen(userId: widget.userId)));
-              }
-            }
+            final tab      = tabs[i];
 
             return GestureDetector(
-              onTap: onTap,
+              onTap: () => onTap(i),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? _primary.withValues(alpha: 0.08)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: isActive
+                    ? BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            _primary.withValues(alpha: 0.10),
+                            _accent.withValues(alpha: 0.07),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: _primary.withValues(alpha: 0.18), width: 1),
+                      )
+                    : const BoxDecoration(
+                        borderRadius: BorderRadius.all(Radius.circular(14))),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      isActive ? item.activeIcon : item.icon,
-                      size: 22,
-                      color: isActive ? _primary : const Color(0xFFAAAAAC),
-                    ),
+                    isActive
+                        ? _gradMask(
+                            child: Icon(tab.activeIcon,
+                                size: 22, color: Colors.white))
+                        : Icon(tab.icon,
+                            size: 22, color: const Color(0xFFABABCC)),
                     const SizedBox(height: 3),
-                    Text(
-                      item.label.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: isActive
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: isActive
-                            ? _primary
-                            : const Color(0xFFAAAAAC),
-                        letterSpacing: 0.3,
-                      ),
-                    ),
+                    isActive
+                        ? _gradMask(
+                            child: Text(
+                              tab.label.toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            tab.label.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFFABABCC),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                   ],
                 ),
               ),
@@ -812,7 +846,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
 // ── Nav Data ──────────────────────────────────────────────────────────────────
 
 class _NavData {
-  final String label;
+  final String   label;
   final IconData icon;
   final IconData activeIcon;
   const _NavData(this.label, this.icon, this.activeIcon);

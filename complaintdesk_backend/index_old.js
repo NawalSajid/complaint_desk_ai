@@ -1,3 +1,4 @@
+//Before integrating AI model
 // ComplaintDesk.AI Backend
 
 require('dotenv').config();
@@ -296,15 +297,7 @@ app.get('/api/complaints', (req, res) => {
   if (isNaN(userId)) return res.status(400).json({ message: 'Invalid user ID' });
 
   db.query(
-    `SELECT * FROM complaints WHERE user_id = ?
-     ORDER BY
-       CASE priority
-         WHEN 'High' THEN 1
-         WHEN 'Medium' THEN 2
-         WHEN 'Low' THEN 3
-         ELSE 4
-       END,
-       created_at DESC`,
+    'SELECT * FROM complaints WHERE user_id = ? ORDER BY created_at DESC',
     [userId],
     (err, results) => {
       if (err) {
@@ -391,14 +384,7 @@ app.get('/api/admin/complaints', (req, res) => {
       u.email AS user_email
     FROM complaints c
     JOIN users u ON u.id = c.user_id
-    ORDER BY
-      CASE c.priority
-        WHEN 'High' THEN 1
-        WHEN 'Medium' THEN 2
-        WHEN 'Low' THEN 3
-        ELSE 4
-      END,
-      c.created_at DESC
+    ORDER BY c.created_at DESC
   `;
 
   db.query(query, (err, results) => {

@@ -58,7 +58,6 @@ class ComplaintItem {
   final String rollNo;
   final String description;
   final String date;
-  final String sortKey;
 
   const ComplaintItem({
     required this.id,
@@ -71,7 +70,6 @@ class ComplaintItem {
     required this.rollNo,
     required this.description,
     required this.date,
-    required this.sortKey,
   });
 
   factory ComplaintItem.fromApi(Map<String, dynamic> json) {
@@ -104,7 +102,6 @@ class ComplaintItem {
       rollNo: (json['user_email'] ?? 'N/A').toString(),
       description: (json['description'] ?? '').toString(),
       date: (json['created_at'] ?? '').toString().split(' ').first,
-      sortKey: (json['created_at'] ?? '').toString(),
     );
   }
 }
@@ -122,7 +119,6 @@ const kAllComplaints = [
     description:
         'The WiFi in hostel block B has been down since yesterday evening. Multiple students are affected and cannot submit assignments online. This is seriously affecting coursework deadlines.',
     date: '15 May 2026',
-    sortKey: '2026-05-15 12:00:00',
   ),
   ComplaintItem(
     id: '#C-1041',
@@ -136,7 +132,6 @@ const kAllComplaints = [
     description:
         'The water supply in hostel block A has been intermittent for the past three days. Students are facing serious hygiene and sanitation issues as a result.',
     date: '15 May 2026',
-    sortKey: '2026-05-15 11:00:00',
   ),
   ComplaintItem(
     id: '#C-1040',
@@ -150,7 +145,6 @@ const kAllComplaints = [
     description:
         'The air conditioning in the main library reading hall has stopped working. The heat is making it very difficult to study, especially during afternoon hours.',
     date: '15 May 2026',
-    sortKey: '2026-05-15 10:00:00',
   ),
   ComplaintItem(
     id: '#C-1039',
@@ -164,7 +158,6 @@ const kAllComplaints = [
     description:
         'The lights in the main parking area have been broken for over a week. The area is completely dark at night, creating a serious safety concern for students and staff.',
     date: '14 May 2026',
-    sortKey: '2026-05-14 12:00:00',
   ),
   ComplaintItem(
     id: '#C-1038',
@@ -178,7 +171,6 @@ const kAllComplaints = [
     description:
         'The projector in IT lab 2 has been faulty for three days. Multiple practical sessions have been impacted and students are falling behind on lab work.',
     date: '14 May 2026',
-    sortKey: '2026-05-14 11:00:00',
   ),
   ComplaintItem(
     id: '#C-1037',
@@ -192,7 +184,6 @@ const kAllComplaints = [
     description:
         'Bus route 3 has been cancelled for three consecutive days without any prior notification. Students from the eastern residential area cannot reach campus on time.',
     date: '14 May 2026',
-    sortKey: '2026-05-14 10:00:00',
   ),
   ComplaintItem(
     id: '#C-1036',
@@ -206,7 +197,6 @@ const kAllComplaints = [
     description:
         'The food quality in the main canteen has deteriorated significantly over the past two weeks. Several students have reported stomach issues after eating from canteen stalls.',
     date: '13 May 2026',
-    sortKey: '2026-05-13 12:00:00',
   ),
   ComplaintItem(
     id: '#C-1035',
@@ -220,7 +210,6 @@ const kAllComplaints = [
     description:
         'The library has been closing at 4pm on Fridays instead of the usual 8pm. Many students rely on the library for evening study and research sessions.',
     date: '13 May 2026',
-    sortKey: '2026-05-13 11:00:00',
   ),
 ];
 
@@ -771,23 +760,11 @@ class AdminComplaintsScreen extends StatefulWidget {
   State<AdminComplaintsScreen> createState() => _AdminComplaintsScreenState();
 }
 
-enum SortOption { recent, oldest, priorityHighLow, priorityLowHigh }
-
-extension SortOptionExt on SortOption {
-  String get label => const [
-    'Recent',
-    'Oldest',
-    'Priority: High to Low',
-    'Priority: Low to High',
-  ][index];
-}
-
 class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
     with SingleTickerProviderStateMixin {
   ComplaintStatus? _activeFilter;
   String _searchQuery = '';
   bool _showSearch = false;
-  SortOption _sortOption = SortOption.recent;
   final _searchCtrl = TextEditingController();
 
   late AnimationController _animCtrl;
@@ -847,20 +824,6 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                 c.studentName.toLowerCase().contains(q),
           )
           .toList();
-    }
-    switch (_sortOption) {
-      case SortOption.recent:
-        list.sort((a, b) => b.sortKey.compareTo(a.sortKey));
-        break;
-      case SortOption.oldest:
-        list.sort((a, b) => a.sortKey.compareTo(b.sortKey));
-        break;
-      case SortOption.priorityHighLow:
-        list.sort((a, b) => a.priority.index.compareTo(b.priority.index));
-        break;
-      case SortOption.priorityLowHigh:
-        list.sort((a, b) => b.priority.index.compareTo(a.priority.index));
-        break;
     }
     return list;
   }
@@ -1095,42 +1058,6 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: kInkLight,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  decoration: BoxDecoration(
-                    color: kSurface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: kBorder),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<SortOption>(
-                      value: _sortOption,
-                      icon: const Icon(
-                        Icons.swap_vert_rounded,
-                        size: 16,
-                        color: kInkLight,
-                      ),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: kInkMid,
-                      ),
-                      isDense: true,
-                      onChanged: (v) {
-                        if (v != null) setState(() => _sortOption = v);
-                      },
-                      items: SortOption.values
-                          .map(
-                            (s) => DropdownMenuItem(
-                              value: s,
-                              child: Text(s.label),
-                            ),
-                          )
-                          .toList(),
-                    ),
                   ),
                 ),
               ],

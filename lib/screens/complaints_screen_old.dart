@@ -42,7 +42,6 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
     with SingleTickerProviderStateMixin {
   List<dynamic> complaints = [];
   bool isLoading = false;
-  String _sortOption = 'Recent';
 
   late AnimationController _controller;
   late Animation<double> _fadeAnim;
@@ -105,54 +104,6 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
     }
   }
 
-  int _priorityRank(String p) {
-    switch (p.toLowerCase()) {
-      case 'high':
-        return 0;
-      case 'medium':
-        return 1;
-      case 'low':
-        return 2;
-      default:
-        return 3;
-    }
-  }
-
-  List<dynamic> get sortedComplaints {
-    final list = List<dynamic>.from(complaints);
-    switch (_sortOption) {
-      case 'Recent':
-        list.sort(
-          (a, b) => (b['created_at'] ?? '').toString().compareTo(
-            (a['created_at'] ?? '').toString(),
-          ),
-        );
-        break;
-      case 'Oldest':
-        list.sort(
-          (a, b) => (a['created_at'] ?? '').toString().compareTo(
-            (b['created_at'] ?? '').toString(),
-          ),
-        );
-        break;
-      case 'Priority: High to Low':
-        list.sort(
-          (a, b) => _priorityRank(
-            a['priority'] ?? 'Normal',
-          ).compareTo(_priorityRank(b['priority'] ?? 'Normal')),
-        );
-        break;
-      case 'Priority: Low to High':
-        list.sort(
-          (a, b) => _priorityRank(
-            b['priority'] ?? 'Normal',
-          ).compareTo(_priorityRank(a['priority'] ?? 'Normal')),
-        );
-        break;
-    }
-    return list;
-  }
-
   // ── BUILD ─────────────────────────────────────────────────────────────────
 
   @override
@@ -207,88 +158,36 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                               ),
                             ],
                           ),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _primary.withValues(alpha: 0.07),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _sortOption,
-                                    icon: const Icon(
-                                      Icons.swap_vert_rounded,
-                                      size: 14,
-                                      color: _primary,
-                                    ),
-                                    style: const TextStyle(
+                          GestureDetector(
+                            onTap: fetchComplaints,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _primary.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(
+                                    Icons.refresh_rounded,
+                                    size: 13,
+                                    color: _primary,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Refresh',
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                       color: _primary,
                                     ),
-                                    isDense: true,
-                                    onChanged: (v) {
-                                      if (v != null)
-                                        setState(() => _sortOption = v);
-                                    },
-                                    items: const [
-                                      DropdownMenuItem(
-                                        value: 'Recent',
-                                        child: Text('Recent'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Oldest',
-                                        child: Text('Oldest'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Priority: High to Low',
-                                        child: Text('Priority: High to Low'),
-                                      ),
-                                      DropdownMenuItem(
-                                        value: 'Priority: Low to High',
-                                        child: Text('Priority: Low to High'),
-                                      ),
-                                    ],
                                   ),
-                                ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: fetchComplaints,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _primary.withValues(alpha: 0.07),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: const [
-                                      Icon(
-                                        Icons.refresh_rounded,
-                                        size: 13,
-                                        color: _primary,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Refresh',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: _primary,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),
@@ -301,7 +200,7 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                           : complaints.isEmpty
                           ? _buildEmptyState()
                           : Column(
-                              children: sortedComplaints
+                              children: complaints
                                   .map(
                                     (c) => _buildComplaintCard(
                                       c['category'] ?? 'General',

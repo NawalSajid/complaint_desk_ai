@@ -1,8 +1,19 @@
+// ignore_for_file: curly_braces_in_flow_control_structures
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../constants.dart';
+import 'admin_complaint_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final String adminId;
-  const AdminDashboardScreen({super.key, required this.adminId});
+  final void Function(int) onNavTap;
+  const AdminDashboardScreen({
+    super.key,
+    required this.adminId,
+    required this.onNavTap,
+  });
 
   @override
   State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
@@ -10,192 +21,133 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     with TickerProviderStateMixin {
-  // ── Brand colours ──────────────────────────────────────────────────────────
-  static const Color _purple = Color(0xFF9C27B0);
+  static const Color _purple     = Color(0xFF9C27B0);
   static const Color _deepPurple = Color(0xFF7B1FA2);
-  static const Color _cyan = Color(0xFF00BCD4);
-  static const Color _bg = Color(0xFFF4F0FB);
-  static const Color _cardBg = Colors.white;
+  static const Color _darkPurple = Color(0xFF6A0080);
+  static const Color _cyan       = Color(0xFF00BCD4);
 
-  // ── Bottom-nav index ────────────────────────────────────────────────────────
-  int _navIndex = 0;
+  late AnimationController _entryCtrl;
+  late Animation<double>   _fadeIn;
+  late Animation<Offset>   _slideUp;
 
-  // ── Animation ───────────────────────────────────────────────────────────────
-  late AnimationController _entryController;
-  late Animation<double> _fadeIn;
-  late Animation<Offset> _slideUp;
-
-  // ── Priority bar animation controllers ──────────────────────────────────────
-  late AnimationController _barController;
-  late Animation<double> _highAnim;
-  late Animation<double> _medAnim;
-  late Animation<double> _lowAnim;
-
-  // ── Stat data ────────────────────────────────────────────────────────────────
-  final int _total = 128;
-  final int _pending = 34;
-  final int _inProgress = 52;
-  final int _resolved = 42;
-
-  // Priority counts
-  final int _high = 77;
-  final int _medium = 38;
-  final int _low = 13;
-
-  // ── Recent complaints (dummy) ────────────────────────────────────────────────
-  final List<Map<String, dynamic>> _recent = [
-    {
-      'id': '#C-1041',
-      'title': 'Hostel water supply issue',
-      'dept': 'Hostel',
-      'status': 'Pending',
-      'priority': 'High',
-      'time': '2h ago',
-    },
-    {
-      'id': '#C-1040',
-      'title': 'Library AC not working',
-      'dept': 'General',
-      'status': 'In Progress',
-      'priority': 'Medium',
-      'time': '4h ago',
-    },
-    {
-      'id': '#C-1039',
-      'title': 'Parking area lights broken',
-      'dept': 'General',
-      'status': 'Pending',
-      'priority': 'Low',
-      'time': '6h ago',
-    },
-    {
-      'id': '#C-1038',
-      'title': 'IT lab projector fault',
-      'dept': 'Academic',
-      'status': 'Resolved',
-      'priority': 'High',
-      'time': '1d ago',
-    },
-  ];
+  bool _loading = true;
+  int  _total = 0, _pending = 0, _inProgress = 0, _resolved = 0;
+  int  _high = 0, _medium = 0, _low = 0;
+  List<ComplaintItem> _recentItems = [];
 
   @override
   void initState() {
     super.initState();
 
-    _entryController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeIn = CurvedAnimation(parent: _entryController, curve: Curves.easeOut);
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.1),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _entryController, curve: Curves.easeOut));
+    _entryCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 800));
+    _fadeIn  = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut);
+    _slideUp = Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut));
 
-    _barController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-    final maxVal = _high.toDouble();
-    _highAnim = Tween<double>(begin: 0, end: _high / maxVal).animate(
-      CurvedAnimation(
-          parent: _barController,
-          curve: const Interval(0.0, 0.7, curve: Curves.easeOut)),
-    );
-    _medAnim = Tween<double>(begin: 0, end: _medium / maxVal).animate(
-      CurvedAnimation(
-          parent: _barController,
-          curve: const Interval(0.1, 0.8, curve: Curves.easeOut)),
-    );
-    _lowAnim = Tween<double>(begin: 0, end: _low / maxVal).animate(
-      CurvedAnimation(
-          parent: _barController,
-          curve: const Interval(0.2, 0.9, curve: Curves.easeOut)),
-    );
-
-    _entryController.forward();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) _barController.forward();
-    });
+    _entryCtrl.forward();
+    _fetchAll();
   }
 
   @override
   void dispose() {
-    _entryController.dispose();
-    _barController.dispose();
+    _entryCtrl.dispose();
     super.dispose();
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'Pending':
-        return const Color(0xFFF59E0B);
-      case 'In Progress':
-        return _cyan;
-      case 'Resolved':
-        return const Color(0xFF22C55E);
-      default:
-        return Colors.grey;
-    }
+  // ── Fetch everything ───────────────────────────────────────────────────────
+  Future<void> _fetchAll() async {
+    await _fetchComplaints();
+    if (mounted) setState(() => _loading = false);
   }
 
-  Color _priorityColor(String p) {
-    switch (p) {
-      case 'High':
-        return const Color(0xFFEF4444);
-      case 'Medium':
-        return const Color(0xFFF59E0B);
-      case 'Low':
-        return const Color(0xFF22C55E);
-      default:
-        return Colors.grey;
-    }
+  // ── Complaints — same model/parsing as AdminComplaintsScreen ──────────────
+  Future<void> _fetchComplaints() async {
+    try {
+      final res =
+          await http.get(Uri.parse('$baseUrl/api/admin/complaints'));
+      if (res.statusCode != 200) return;
+
+      final list = (jsonDecode(res.body) as List)
+          .map((e) => ComplaintItem.fromApi(e as Map<String, dynamic>))
+          .toList();
+
+      // Sort newest first so "recent" picks the actual latest items
+      list.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+
+      int total = list.length;
+      int pending = 0, inProgress = 0, resolved = 0;
+      int high = 0, medium = 0, low = 0;
+
+      for (final c in list) {
+        if (c.status == ComplaintStatus.pending) {
+          pending++;
+        } else if (c.status == ComplaintStatus.inProgress) {
+          inProgress++;
+        } else if (c.status == ComplaintStatus.resolved) {
+          resolved++;
+        }
+
+        if (c.priority == Priority.high) {
+          high++;
+        } else if (c.priority == Priority.medium) {
+          medium++;
+        } else if (c.priority == Priority.low) {
+          low++;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _total       = total;
+        _pending     = pending;
+        _inProgress  = inProgress;
+        _resolved    = resolved;
+        _high        = high;
+        _medium      = medium;
+        _low         = low;
+        _recentItems = list.take(4).toList();
+      });
+    } catch (_) {}
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────────
+  // ── Build — no Scaffold, no bottom nav (owned by AdminRoot) ───────────────
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      bottomNavigationBar: _buildBottomNav(),
-      body: FadeTransition(
-        opacity: _fadeIn,
-        child: SlideTransition(
-          position: _slideUp,
-          child: _buildBody(),
-        ),
+    return FadeTransition(
+      opacity: _fadeIn,
+      child: SlideTransition(
+        position: _slideUp,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator(color: _purple))
+            : CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  _buildSliverHeader(),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
+                        const SizedBox(height: 20),
+                        _buildStatGrid(),
+                        const SizedBox(height: 24),
+                        _buildPriorityCard(),
+                        const SizedBox(height: 24),
+                        _buildRecentSection(),
+                        const SizedBox(height: 30),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }
 
-  Widget _buildBody() {
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        _buildSliverHeader(),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          sliver: SliverList(
-            delegate: SliverChildListDelegate([
-              const SizedBox(height: 20),
-              _buildStatGrid(),
-              const SizedBox(height: 24),
-              _buildPriorityCard(),
-              const SizedBox(height: 24),
-              _buildRecentSection(),
-              const SizedBox(height: 30),
-            ]),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Sliver App Bar ────────────────────────────────────────────────────────────
+  // ── Header ─────────────────────────────────────────────────────────────────
   Widget _buildSliverHeader() {
     return SliverAppBar(
-      expandedHeight: 130,
+      expandedHeight: 140,
       floating: false,
       pinned: true,
       elevation: 0,
@@ -208,31 +160,46 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF6A0080), _deepPurple],
+              colors: [_darkPurple, _deepPurple],
             ),
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Stack(
+            children: [
+              Positioned(
+                right: -30, top: -30,
+                child: Container(
+                  width: 160, height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withAlpha(10),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: -20, bottom: -20,
+                child: Container(
+                  width: 90, height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _cyan.withAlpha(18),
+                  ),
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Logo
                       Row(
                         children: [
                           Container(
-                            width: 32,
-                            height: 32,
+                            width: 32, height: 32,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  _purple.withAlpha(220),
-                                  _cyan.withAlpha(220)
-                                ],
-                              ),
+                              gradient: LinearGradient(colors: [
+                                _purple.withAlpha(220),
+                                _cyan.withAlpha(220),
+                              ]),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Icon(Icons.campaign_rounded,
@@ -240,224 +207,154 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           ),
                           const SizedBox(width: 8),
                           RichText(
-                            text: const TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Complaint',
-                                  style: TextStyle(
-                                    color: Color(0xFF80DEEA),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.3,
-                                  ),
+                            text: const TextSpan(children: [
+                              TextSpan(
+                                text: 'Complaint',
+                                style: TextStyle(
+                                  color: Color(0xFF80DEEA), fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.3,
                                 ),
-                                TextSpan(
-                                  text: 'Desk',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.3,
-                                  ),
+                              ),
+                              TextSpan(
+                                text: 'Desk',
+                                style: TextStyle(
+                                  color: Colors.white, fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.3,
                                 ),
-                                TextSpan(
-                                  text: '.AI',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w300,
-                                    letterSpacing: -0.3,
-                                  ),
+                              ),
+                              TextSpan(
+                                text: '.AI',
+                                style: TextStyle(
+                                  color: Colors.white, fontSize: 15,
+                                  fontWeight: FontWeight.w300,
+                                  letterSpacing: -0.3,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ]),
                           ),
                         ],
                       ),
-                      // Notification bell
-                      Stack(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(25),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.notifications_outlined,
-                                color: Colors.white, size: 20),
-                          ),
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFF59E0B),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          color: Colors.white, fontSize: 22,
+                          fontWeight: FontWeight.bold, letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        'Welcome, Admin',
+                        style: TextStyle(
+                            color: Colors.white60, fontSize: 12.5),
                       ),
                     ],
                   ),
-                  // FIX: reduced from 14 → 7 to eliminate the 7px overflow
-                  const SizedBox(height: 7),
-                  const Text(
-                    'Dashboard',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Welcome, Admin',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
-      // Collapsed title
     );
   }
 
-  // ── 2×2 Stat Grid ─────────────────────────────────────────────────────────────
+  // ── Stat grid ──────────────────────────────────────────────────────────────
   Widget _buildStatGrid() {
     return GridView.count(
       crossAxisCount: 2,
       crossAxisSpacing: 14,
       mainAxisSpacing: 14,
-      childAspectRatio: 1.55,
+      childAspectRatio: 1.45,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
         _StatCard(
-          label: 'Total Complaints',
-          value: _total,
+          label: 'Total', sublabel: 'Complaints', value: _total,
           icon: Icons.description_outlined,
+          accentColor: _cyan,
           gradientColors: const [Color(0xFF00BCD4), Color(0xFF0097A7)],
-          iconBg: Colors.white.withAlpha(45),
+          darkText: false,
         ),
         _StatCard(
-          label: 'Pending',
-          value: _pending,
+          label: 'Pending', sublabel: 'Awaiting review', value: _pending,
           icon: Icons.schedule_rounded,
-          gradientColors: const [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
-          iconBg: Colors.white.withAlpha(45),
+          accentColor: const Color(0xFFF59E0B),
+          gradientColors: const [Color(0xFF9C27B0), Color(0xFF6A0080)],
+          darkText: false,
         ),
         _StatCard(
-          label: 'In Progress',
-          value: _inProgress,
+          label: 'In Progress', sublabel: 'Being handled', value: _inProgress,
           icon: Icons.sync_rounded,
-          gradientColors: const [Color(0xFFF8F8F8), Color(0xFFEEEEEE)],
-          iconBg: _cyan.withAlpha(28),
+          accentColor: _cyan,
+          gradientColors: const [Colors.white, Color(0xFFEAF8FB)],
           darkText: true,
         ),
         _StatCard(
-          label: 'Resolved',
-          value: _resolved,
+          label: 'Resolved', sublabel: 'Completed', value: _resolved,
           icon: Icons.check_circle_outline_rounded,
-          gradientColors: const [Color(0xFFF8F8F8), Color(0xFFEEEEEE)],
-          iconBg: _purple.withAlpha(22),
+          accentColor: const Color(0xFF22C55E),
+          gradientColors: const [Colors.white, Color(0xFFEAFBEE)],
           darkText: true,
         ),
       ],
     );
   }
 
-  // ── Priority breakdown card ────────────────────────────────────────────────────
+  // ── Priority breakdown card ─────────────────────────────────────────────────
   Widget _buildPriorityCard() {
+    final total = _high + _medium + _low;
+    final safeTotal = total > 0 ? total.toDouble() : 1.0;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _cardBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEEEEF5)),
         boxShadow: [
           BoxShadow(
-            color: _purple.withAlpha(14),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: _purple.withAlpha(12),
+            blurRadius: 16, offset: const Offset(0, 5),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Priority Breakdown',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A1A2E),
-                  letterSpacing: -0.2,
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _bg,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'This Week',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          AnimatedBuilder(
-            animation: _barController,
-            builder: (_, __) => Column(
-              children: [
-                _PriorityBar(
-                  label: 'High',
-                  count: _high,
-                  progress: _highAnim.value,
-                  color: const Color(0xFFEF4444),
-                ),
-                const SizedBox(height: 13),
-                _PriorityBar(
-                  label: 'Medium',
-                  count: _medium,
-                  progress: _medAnim.value,
-                  color: const Color(0xFFF59E0B),
-                ),
-                const SizedBox(height: 13),
-                _PriorityBar(
-                  label: 'Low',
-                  count: _low,
-                  progress: _lowAnim.value,
-                  color: const Color(0xFF22C55E),
-                ),
-              ],
+          const Text(
+            'Priority Breakdown',
+            style: TextStyle(
+              fontSize: 15, fontWeight: FontWeight.bold,
+              color: Color(0xFF1A1A2E), letterSpacing: -0.2,
             ),
+          ),
+          const SizedBox(height: 16),
+          _PriorityRow(
+            label: 'High', count: _high,
+            fraction: _high / safeTotal,
+            color: const Color(0xFFEF4444),
+          ),
+          const SizedBox(height: 12),
+          _PriorityRow(
+            label: 'Medium', count: _medium,
+            fraction: _medium / safeTotal,
+            color: const Color(0xFFF59E0B),
+          ),
+          const SizedBox(height: 12),
+          _PriorityRow(
+            label: 'Low', count: _low,
+            fraction: _low / safeTotal,
+            color: const Color(0xFF22C55E),
           ),
         ],
       ),
     );
   }
 
-  // ── Recent Complaints ─────────────────────────────────────────────────────────
+  // ── Recent complaints ──────────────────────────────────────────────────────
   Widget _buildRecentSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,19 +365,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             const Text(
               'Recent Complaints',
               style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1A1A2E),
-                letterSpacing: -0.2,
+                fontSize: 15, fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A2E), letterSpacing: -0.2,
               ),
             ),
             GestureDetector(
-              onTap: () {},
+              onTap: () => widget.onNavTap(1), // 1 = Complaints tab
               child: Text(
                 'View all',
                 style: TextStyle(
-                  fontSize: 12.5,
-                  color: _purple,
+                  fontSize: 12.5, color: _purple,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -488,114 +382,55 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ],
         ),
         const SizedBox(height: 14),
-        ...List.generate(
-          _recent.length,
-          (i) => _ComplaintTile(
-            data: _recent[i],
-            statusColor: _statusColor(_recent[i]['status']),
-            priorityColor: _priorityColor(_recent[i]['priority']),
-          ),
-        ),
+        if (_recentItems.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text(
+                'No complaints yet',
+                style: TextStyle(
+                    color: Colors.grey.shade400, fontSize: 13),
+              ),
+            ),
+          )
+        else
+          ..._recentItems.map((c) => _ComplaintTile(
+                item: c,
+                onUpdated: _fetchComplaints,
+              )),
       ],
-    );
-  }
-
-  // ── Bottom Navigation ─────────────────────────────────────────────────────────
-  Widget _buildBottomNav() {
-    const items = [
-      {'icon': Icons.grid_view_rounded, 'label': 'Home'},
-      {'icon': Icons.list_alt_rounded, 'label': 'Complaints'},
-      {'icon': Icons.bar_chart_rounded, 'label': 'Analytics'},
-      {'icon': Icons.settings_rounded, 'label': 'Settings'},
-    ];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: _purple.withAlpha(18),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(items.length, (i) {
-              final selected = _navIndex == i;
-              final icon = items[i]['icon'] as IconData;
-              final label = items[i]['label'] as String;
-              return GestureDetector(
-                onTap: () => setState(() => _navIndex = i),
-                behavior: HitTestBehavior.opaque,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: selected ? _purple.withAlpha(18) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        icon,
-                        size: 22,
-                        color: selected ? _purple : Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                          color: selected ? _purple : Colors.grey.shade400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ),
-        ),
-      ),
     );
   }
 }
 
-// ── Reusable Stat Card ─────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// STAT CARD — no top strip, decorative circle only
+// ══════════════════════════════════════════════════════════════════════════════
 class _StatCard extends StatelessWidget {
-  final String label;
+  final String label, sublabel;
   final int value;
   final IconData icon;
+  final Color accentColor;
   final List<Color> gradientColors;
-  final Color iconBg;
   final bool darkText;
 
   const _StatCard({
     required this.label,
+    required this.sublabel,
     required this.value,
     required this.icon,
+    required this.accentColor,
     required this.gradientColors,
-    required this.iconBg,
-    this.darkText = false,
+    required this.darkText,
   });
 
   @override
   Widget build(BuildContext context) {
     final textColor = darkText ? const Color(0xFF1A1A2E) : Colors.white;
-    final subColor = darkText ? Colors.grey.shade500 : Colors.white70;
+    final subColor  = darkText ? const Color(0xFF8888A0) : Colors.white70;
+    final iconColor = darkText ? accentColor : Colors.white;
 
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -603,47 +438,69 @@ class _StatCard extends StatelessWidget {
           colors: gradientColors,
         ),
         borderRadius: BorderRadius.circular(20),
+        border: darkText
+            ? Border.all(color: const Color(0xFFEEEEF5))
+            : null,
         boxShadow: [
           BoxShadow(
-            color: gradientColors.first.withAlpha(darkText ? 14 : 60),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: gradientColors.first.withAlpha(darkText ? 20 : 80),
+            blurRadius: 14, offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                value.toString(),
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                  letterSpacing: -0.5,
-                ),
+          Positioned(
+            right: -14, bottom: -14,
+            child: Container(
+              width: 72, height: 72,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: accentColor.withAlpha(darkText ? 20 : 35),
               ),
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(icon, size: 16, color: textColor),
-              ),
-            ],
+            ),
           ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              color: subColor,
-              fontWeight: FontWeight.w500,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 34, height: 34,
+                      decoration: BoxDecoration(
+                        color: accentColor.withAlpha(darkText ? 22 : 50),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(icon, size: 17, color: iconColor),
+                    ),
+                    Text(
+                      value.toString(),
+                      style: TextStyle(
+                        fontSize: 28, fontWeight: FontWeight.bold,
+                        color: textColor, letterSpacing: -1,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700,
+                    color: textColor, letterSpacing: -0.2,
+                  ),
+                ),
+                Text(
+                  sublabel,
+                  style: TextStyle(
+                    fontSize: 10.5, color: subColor,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -652,17 +509,19 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ── Priority Bar Row ───────────────────────────────────────────────────────────
-class _PriorityBar extends StatelessWidget {
+// ══════════════════════════════════════════════════════════════════════════════
+// PRIORITY ROW
+// ══════════════════════════════════════════════════════════════════════════════
+class _PriorityRow extends StatelessWidget {
   final String label;
   final int count;
-  final double progress; // 0.0 – 1.0
+  final double fraction;
   final Color color;
 
-  const _PriorityBar({
+  const _PriorityRow({
     required this.label,
     required this.count,
-    required this.progress,
+    required this.fraction,
     required this.color,
   });
 
@@ -675,8 +534,7 @@ class _PriorityBar extends StatelessWidget {
           child: Text(
             label,
             style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w500,
+              fontSize: 12.5, fontWeight: FontWeight.w600,
               color: Color(0xFF555555),
             ),
           ),
@@ -689,21 +547,20 @@ class _PriorityBar extends StatelessWidget {
                 height: 8,
                 decoration: BoxDecoration(
                   color: color.withAlpha(28),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(99),
                 ),
               ),
               FractionallySizedBox(
-                widthFactor: progress.clamp(0.0, 1.0),
+                widthFactor: fraction.clamp(0.0, 1.0),
                 child: Container(
                   height: 8,
                   decoration: BoxDecoration(
                     color: color,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(99),
                     boxShadow: [
                       BoxShadow(
                         color: color.withAlpha(80),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
+                        blurRadius: 6, offset: const Offset(0, 2),
                       ),
                     ],
                   ),
@@ -719,9 +576,7 @@ class _PriorityBar extends StatelessWidget {
             count.toString(),
             textAlign: TextAlign.right,
             style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.bold,
-              color: color,
+              fontSize: 12.5, fontWeight: FontWeight.bold, color: color,
             ),
           ),
         ),
@@ -730,111 +585,106 @@ class _PriorityBar extends StatelessWidget {
   }
 }
 
-// ── Complaint List Tile ────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPLAINT TILE — uses the same ComplaintItem model as the Complaints screen
+// ══════════════════════════════════════════════════════════════════════════════
 class _ComplaintTile extends StatelessWidget {
-  final Map<String, dynamic> data;
-  final Color statusColor;
-  final Color priorityColor;
-
-  const _ComplaintTile({
-    required this.data,
-    required this.statusColor,
-    required this.priorityColor,
-  });
+  final ComplaintItem item;
+  final VoidCallback? onUpdated;
+  const _ComplaintTile({required this.item, this.onUpdated});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(10),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Priority dot
-          Container(
-            width: 10,
-            height: 10,
-            margin: const EdgeInsets.only(right: 12),
-            decoration: BoxDecoration(
-              color: priorityColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                    color: priorityColor.withAlpha(100), blurRadius: 6)
-              ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => AdminComplaintDetailScreen(complaint: item),
+        ),
+      ).then((_) => onUpdated?.call()),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFEEEEF5)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(10),
+              blurRadius: 10, offset: const Offset(0, 3),
             ),
-          ),
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      data['id'],
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: Colors.grey.shade400,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withAlpha(22),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        data['status'],
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 10, height: 10,
+              margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(
+                color: item.priority.dot,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                      color: item.priority.dot.withAlpha(100), blurRadius: 6),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        item.id,
                         style: TextStyle(
-                          fontSize: 9.5,
-                          color: statusColor,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 10.5, color: Colors.grey.shade400,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: item.status.bg,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.status.label,
+                          style: TextStyle(
+                            fontSize: 9.5, color: item.status.fg,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A2E), letterSpacing: -0.1,
                     ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  data['title'],
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A2E),
-                    letterSpacing: -0.1,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${data['dept']}  ·  ${data['time']}',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.shade400,
+                  const SizedBox(height: 3),
+                  Text(
+                    '${item.category}  ·  ${item.timeAgo}',
+                    style: TextStyle(
+                        fontSize: 11, color: Colors.grey.shade400),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.chevron_right_rounded,
-              color: Colors.grey.shade300, size: 20),
-        ],
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded,
+                color: Colors.grey.shade300, size: 20),
+          ],
+        ),
       ),
     );
   }

@@ -114,13 +114,17 @@ db.connect(err => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // Test API
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.get('/', (req, res) => {
   res.send('ComplaintDesk.AI Backend is running');
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // REGISTER API
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.post('/api/register', async (req, res) => {
   const { name, email, password, role } = req.body;
@@ -149,7 +153,9 @@ app.post('/api/register', async (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // LOGIN API
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.post('/api/login', (req, res) => {
   const { email, password, role } = req.body;
@@ -163,13 +169,11 @@ app.post('/api/login', (req, res) => {
     if (results.length === 0) return res.status(401).json({ message: 'Invalid email or password' });
 
     const user = results[0];
-    // Support both properly hashed passwords and legacy plain-text records.
     let isMatch = false;
     if (typeof user.password === 'string' && user.password.startsWith('$2')) {
       isMatch = await bcrypt.compare(password, user.password);
     } else {
       isMatch = password === user.password;
-      // Optional auto-migration to bcrypt after successful legacy login.
       if (isMatch) {
         const newHashed = await bcrypt.hash(password, 10);
         db.query('UPDATE users SET password = ? WHERE id = ?', [newHashed, user.id]);
@@ -191,7 +195,9 @@ app.post('/api/login', (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // GET USER PROFILE API
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.get('/api/users/:id', (req, res) => {
   const userId = parseInt(req.params.id);
@@ -211,7 +217,9 @@ app.get('/api/users/:id', (req, res) => {
   );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // UPDATE USER NAME API
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.put('/api/users/:id', (req, res) => {
   const userId = parseInt(req.params.id);
@@ -236,7 +244,9 @@ app.put('/api/users/:id', (req, res) => {
   );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ADD COMPLAINT API
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.post('/api/complaints', async (req, res) => {
   const { user_id, category, description, document } = req.body;
@@ -289,22 +299,29 @@ app.post('/api/complaints', async (req, res) => {
   );
 });
 
-// GET COMPLAINTS API
+// ─────────────────────────────────────────────────────────────────────────────
+// GET COMPLAINTS API  ← fixed: now returns latest admin_remark
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.get('/api/complaints', (req, res) => {
   const userId = parseInt(req.query.user_id);
   if (isNaN(userId)) return res.status(400).json({ message: 'Invalid user ID' });
 
   db.query(
-    `SELECT * FROM complaints WHERE user_id = ?
+    `SELECT c.*,
+       (SELECT cr.admin_remark FROM complaint_remarks cr
+        WHERE cr.complaint_id = c.id
+        ORDER BY cr.created_at DESC LIMIT 1) AS admin_remark
+     FROM complaints c
+     WHERE c.user_id = ?
      ORDER BY
-       CASE priority
+       CASE c.priority
          WHEN 'High' THEN 1
          WHEN 'Medium' THEN 2
          WHEN 'Low' THEN 3
          ELSE 4
        END,
-       created_at DESC`,
+       c.created_at DESC`,
     [userId],
     (err, results) => {
       if (err) {
@@ -321,12 +338,41 @@ app.get('/api/complaints', (req, res) => {
         status: c.status,
         priority: c.priority,
         created_at: c.created_at,
+        admin_remark: c.admin_remark || '',
       })));
     }
   );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// USER CONFIRM RESOLUTION API  ← NEW
+// ─────────────────────────────────────────────────────────────────────────────
+
+app.put('/api/complaints/:id/confirm', (req, res) => {
+  const complaintId = parseInt(req.params.id);
+  if (isNaN(complaintId))
+    return res.status(400).json({ message: 'Invalid complaint ID' });
+
+  db.query(
+    'UPDATE complaints SET status = ? WHERE id = ?',
+    ['Confirmed', complaintId],
+    (err, result) => {
+      if (err) {
+        console.error('❌ Confirm resolution error:', err);
+        return res.status(500).json({ message: 'Database error' });
+      }
+      if (result.affectedRows === 0)
+        return res.status(404).json({ message: 'Complaint not found' });
+
+      res.json({ message: 'Resolution confirmed successfully' });
+    }
+  );
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // USER FEEDBACK API
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.post('/api/feedback', (req, res) => {
   const userId = parseInt(req.body.user_id);
   const message = (req.body.message || '').toString().trim();
@@ -347,7 +393,10 @@ app.post('/api/feedback', (req, res) => {
   );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN OVERVIEW API
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.get('/api/admin/overview', (req, res) => {
   const overviewQuery = `
     SELECT
@@ -375,7 +424,10 @@ app.get('/api/admin/overview', (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN GET ALL COMPLAINTS API
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.get('/api/admin/complaints', (req, res) => {
   const query = `
     SELECT
@@ -388,7 +440,10 @@ app.get('/api/admin/complaints', (req, res) => {
       c.priority,
       c.created_at,
       u.name AS user_name,
-      u.email AS user_email
+      u.email AS user_email,
+      (SELECT cr.admin_remark FROM complaint_remarks cr
+       WHERE cr.complaint_id = c.id
+       ORDER BY cr.created_at DESC LIMIT 1) AS admin_remark
     FROM complaints c
     JOIN users u ON u.id = c.user_id
     ORDER BY
@@ -418,11 +473,15 @@ app.get('/api/admin/complaints', (req, res) => {
       status: c.status,
       priority: c.priority,
       created_at: c.created_at,
+      admin_remark: c.admin_remark || '',
     })));
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN UPDATE COMPLAINT STATUS API
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.put('/api/admin/complaints/:id/status', (req, res) => {
   const complaintId = parseInt(req.params.id);
   const { status, admin_remark } = req.body;
@@ -460,7 +519,10 @@ app.put('/api/admin/complaints/:id/status', (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // ADMIN SETTINGS APIs
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.get('/api/admin/settings', (req, res) => {
   db.query('SELECT * FROM admin_settings WHERE id = 1', (err, results) => {
     if (err) return res.status(500).json({ message: 'Database error' });
@@ -494,6 +556,10 @@ app.put('/api/admin/settings', (req, res) => {
   );
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN EXPORT CSV API
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.get('/api/admin/export/complaints.csv', (req, res) => {
   const query = `
     SELECT c.id, u.name AS user_name, u.email AS user_email, c.category, c.description, c.status, c.priority, c.created_at
@@ -523,6 +589,10 @@ app.get('/api/admin/export/complaints.csv', (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ADMIN RESET ALL COMPLAINTS API
+// ─────────────────────────────────────────────────────────────────────────────
+
 app.delete('/api/admin/complaints', (req, res) => {
   db.query('DELETE FROM complaints', (err) => {
     if (err) return res.status(500).json({ message: 'Database error' });
@@ -530,7 +600,9 @@ app.delete('/api/admin/complaints', (req, res) => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
 // Start Server
+// ─────────────────────────────────────────────────────────────────────────────
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);

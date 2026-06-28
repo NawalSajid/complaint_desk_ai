@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, no_leading_underscores_for_local_identifiers
 
 import 'package:flutter/material.dart';
 import 'package:complaint_desk_ai/screens/home_screen.dart';
@@ -21,8 +21,6 @@ const LinearGradient _grad = LinearGradient(
   end: Alignment.bottomRight,
 );
 
-// ── Gradient helpers ──────────────────────────────────────────────────────────
-
 Widget _gradMask({required Widget child}) => ShaderMask(
       blendMode: BlendMode.srcIn,
       shaderCallback: (b) => _grad.createShader(b),
@@ -44,6 +42,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
   int pending    = 0;
   int inProgress = 0;
   int resolved   = 0;
+  int confirmed  = 0;
   bool isLoading = true;
 
   late AnimationController _controller;
@@ -66,7 +65,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     super.dispose();
   }
 
-  // ── BACKEND LOGIC — UNTOUCHED ─────────────────────────────────────────────
+  // ── FETCH & COUNT ─────────────────────────────────────────────────────────
 
   Future<void> fetchComplaintStats() async {
     try {
@@ -76,15 +75,40 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
 
       if (response.statusCode == 200) {
         final List complaints = jsonDecode(response.body);
+
+        int _pending    = 0;
+        int _inProgress = 0;
+        int _resolved   = 0;
+        int _confirmed  = 0;
+
+        for (final c in complaints) {
+          final status = (c['status'] ?? '').toString().toLowerCase().trim();
+          switch (status) {
+            case 'new':
+            case 'pending':
+              _pending++;
+              break;
+            case 'in progress':
+            case 'in-progress':
+            case 'inprogress':
+            case 'in_progress':
+              _inProgress++;
+              break;
+            case 'resolved':
+              _resolved++;
+              break;
+            case 'confirmed':
+              _confirmed++;
+              break;
+          }
+        }
+
         setState(() {
           total      = complaints.length;
-          pending    = complaints.where((c) =>
-              c['status'] == 'New' || c['status'] == 'Pending').length;
-          inProgress = complaints.where((c) =>
-              c['status'] == 'In-Progress' ||
-              c['status'] == 'In Progress'  ||
-              c['status'] == 'in_progress').length;
-          resolved   = complaints.where((c) => c['status'] == 'Resolved').length;
+          pending    = _pending;
+          inProgress = _inProgress;
+          resolved   = _resolved;
+          confirmed  = _confirmed;
         });
       }
     } catch (e) {
@@ -96,6 +120,9 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
       }
     }
   }
+
+  // Resolved + Confirmed combined for display
+  int get resolvedTotal => resolved + confirmed;
 
   // ── BUILD ─────────────────────────────────────────────────────────────────
 
@@ -183,7 +210,6 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           child: Row(
             children: [
-              // Back button
               GestureDetector(
                 onTap: () => Navigator.pushReplacement(
                   context,
@@ -206,8 +232,6 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-
-              // ── Gradient title ─────────────────────────────────────────
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -234,10 +258,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                   ),
                 ],
               ),
-
               const Spacer(),
-
-              // Refresh button
               GestureDetector(
                 onTap: () async {
                   setState(() => isLoading = true);
@@ -291,7 +312,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     );
   }
 
-  // ── Banner (purple → cyan gradient) ───────────────────────────────────────
+  // ── Banner ────────────────────────────────────────────────────────────────
 
   Widget _buildBanner() {
     return Container(
@@ -314,13 +335,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
       ),
       child: Stack(
         children: [
-          // Decorative circles
           Positioned(
-            right: -16,
-            top: -16,
+            right: -16, top: -16,
             child: Container(
-              width: 90,
-              height: 90,
+              width: 90, height: 90,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withValues(alpha: 0.06),
@@ -328,11 +346,9 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             ),
           ),
           Positioned(
-            right: 20,
-            bottom: -20,
+            right: 20, bottom: -20,
             child: Container(
-              width: 55,
-              height: 55,
+              width: 55, height: 55,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withValues(alpha: 0.05),
@@ -393,18 +409,15 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                   ],
                 ),
               ),
-              // Icon badge
               Container(
-                width: 80,
-                height: 80,
+                width: 80, height: 80,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Container(
-                    width: 52,
-                    height: 52,
+                    width: 52, height: 52,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.15),
                       shape: BoxShape.circle,
@@ -427,9 +440,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
   // ── Progress Card ─────────────────────────────────────────────────────────
 
   Widget _buildProgressCard() {
-    final double pendingPct  = total == 0 ? 0 : pending / total;
-    final double progressPct = total == 0 ? 0 : inProgress / total;
-    final double resolvedPct = total == 0 ? 0 : resolved / total;
+    final double pendingPct    = total == 0 ? 0 : pending / total;
+    final double progressPct   = total == 0 ? 0 : inProgress / total;
+    final double resolvedPct   = total == 0 ? 0 : resolved / total;
+    final double confirmedPct  = total == 0 ? 0 : confirmed / total;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
@@ -478,6 +492,16 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             percentage: resolvedPct,
             color: const Color(0xFF0BAB64),
           ),
+          // Only show confirmed row if any exist
+          if (confirmed > 0) ...[
+            const SizedBox(height: 12),
+            _buildProgressRow(
+              label: 'Confirmed',
+              count: confirmed,
+              percentage: confirmedPct,
+              color: const Color(0xFF00897B),
+            ),
+          ],
         ],
       ),
     );
@@ -499,8 +523,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             Row(
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: 8, height: 8,
                   decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                 ),
                 const SizedBox(width: 8),
@@ -518,11 +541,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
               children: [
                 Text(
                   count.toString(),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                  ),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -554,10 +573,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
   // ── Stat Card ─────────────────────────────────────────────────────────────
 
   Widget _buildStatCard({
-    required String  count,
-    required String  title,
-    required String  subtitle,
-    required Color   color,
+    required String   count,
+    required String   title,
+    required String   subtitle,
+    required Color    color,
     required IconData icon,
     double value = 0,
   }) {
@@ -579,8 +598,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 36, height: 36,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(10),
@@ -628,10 +646,12 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     );
   }
 
-  // ── Resolved Banner ───────────────────────────────────────────────────────
+  // ── Resolved Banner — counts both Resolved + Confirmed ───────────────────
 
   Widget _buildResolvedBanner() {
-    final resolvedPct = total == 0 ? 0 : ((resolved / total) * 100).round();
+    final int    displayCount = resolvedTotal;
+    final double resolvedPct  = total == 0 ? 0 : (displayCount / total);
+    final int    pctInt       = (resolvedPct * 100).round();
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -650,8 +670,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 48, height: 48,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFF0BAB64), Color(0xFF3DCC91)],
@@ -667,8 +686,8 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   'Resolved',
                   style: TextStyle(
                     fontSize: 13,
@@ -677,10 +696,12 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                     letterSpacing: -0.2,
                   ),
                 ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
-                  'Successfully closed complaints',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
+                  confirmed > 0
+                      ? '$resolved resolved · $confirmed confirmed by you'
+                      : 'Successfully closed complaints',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
                 ),
               ],
             ),
@@ -689,7 +710,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                resolved.toString(),
+                displayCount.toString(),
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w800,
@@ -699,7 +720,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                 ),
               ),
               Text(
-                '$resolvedPct% of total',
+                '$pctInt% of total',
                 style: const TextStyle(
                   fontSize: 10.5,
                   color: Color(0xFFB0B0C0),
@@ -719,10 +740,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const CircularProgressIndicator(color: _primary, strokeWidth: 2.5),
-          const SizedBox(height: 14),
-          const Text(
+        children: const [
+          CircularProgressIndicator(color: _primary, strokeWidth: 2.5),
+          SizedBox(height: 14),
+          Text(
             'Loading statistics…',
             style: TextStyle(
               fontSize: 13,
@@ -735,7 +756,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     );
   }
 
-  // ── Bottom Nav (matches profile_screen gradient style) ────────────────────
+  // ── Bottom Nav ────────────────────────────────────────────────────────────
 
   Widget _buildBottomNav() {
     const tabs = [
@@ -806,10 +827,8 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                   children: [
                     isActive
                         ? _gradMask(
-                            child: Icon(tab.activeIcon,
-                                size: 22, color: Colors.white))
-                        : Icon(tab.icon,
-                            size: 22, color: const Color(0xFFABABCC)),
+                            child: Icon(tab.activeIcon, size: 22, color: Colors.white))
+                        : Icon(tab.icon, size: 22, color: const Color(0xFFABABCC)),
                     const SizedBox(height: 3),
                     isActive
                         ? _gradMask(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:complaint_desk_ai/screens/analytics_screen.dart';
 import 'package:complaint_desk_ai/screens/admin_setting_screen.dart';
+import 'package:complaint_desk_ai/screens/admin_dashboard_screen.dart'; // ← your separate file
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../constants.dart';
@@ -74,6 +75,22 @@ class ComplaintItem {
     required this.sortKey,
   });
 
+  // ── Format ISO datetime to "dd/mm/yyyy  HH:mm" ───────────────────────────
+  static String _formatDateTime(String raw) {
+    if (raw.isEmpty) return '—';
+    try {
+      final dt    = DateTime.parse(raw).toLocal();
+      final day   = dt.day.toString().padLeft(2, '0');
+      final month = dt.month.toString().padLeft(2, '0');
+      final year  = dt.year.toString();
+      final hour  = dt.hour.toString().padLeft(2, '0');
+      final min   = dt.minute.toString().padLeft(2, '0');
+      return '$day/$month/$year  $hour:$min';
+    } catch (_) {
+      return raw;
+    }
+  }
+
   factory ComplaintItem.fromApi(Map<String, dynamic> json) {
     final statusRaw = (json['status'] ?? 'Pending').toString();
     final priorityRaw = (json['priority'] ?? 'Medium').toString();
@@ -81,8 +98,9 @@ class ComplaintItem {
     ComplaintStatus mapStatus(String s) {
       final v = s.toLowerCase();
       if (v == 'resolved') return ComplaintStatus.resolved;
-      if (v == 'in progress' || v == 'in_progress')
+      if (v == 'in progress' || v == 'in_progress') {
         return ComplaintStatus.inProgress;
+      }
       return ComplaintStatus.pending;
     }
 
@@ -93,19 +111,20 @@ class ComplaintItem {
       return Priority.medium;
     }
 
+    final createdAt = (json['created_at'] ?? '').toString();
+
     return ComplaintItem(
       id: '#C-${json['id']}',
-
       title: (json['description'] ?? 'Complaint').toString(),
       category: (json['category'] ?? 'General').toString(),
       priority: mapPriority(priorityRaw),
       status: mapStatus(statusRaw),
-      timeAgo: 'Now',
+      timeAgo: _formatDateTime(createdAt),
       studentName: (json['user_name'] ?? 'Unknown User').toString(),
       rollNo: (json['user_email'] ?? 'N/A').toString(),
       description: (json['description'] ?? '').toString(),
-      date: (json['created_at'] ?? '').toString().split(' ').first,
-      sortKey: (json['created_at'] ?? '').toString(),
+      date: createdAt.split(' ').first,
+      sortKey: createdAt,
     );
   }
 }
@@ -117,7 +136,7 @@ const kAllComplaints = [
     category: 'Hostel',
     priority: Priority.high,
     status: ComplaintStatus.pending,
-    timeAgo: '2h ago',
+    timeAgo: '15/05/2026  12:00',
     studentName: 'Areeba Khan',
     rollNo: 'CS-21-045',
     description:
@@ -131,7 +150,7 @@ const kAllComplaints = [
     category: 'Hostel',
     priority: Priority.high,
     status: ComplaintStatus.pending,
-    timeAgo: '2h ago',
+    timeAgo: '15/05/2026  11:00',
     studentName: 'Hamza Raza',
     rollNo: 'EE-22-011',
     description:
@@ -145,7 +164,7 @@ const kAllComplaints = [
     category: 'General',
     priority: Priority.medium,
     status: ComplaintStatus.inProgress,
-    timeAgo: '4h ago',
+    timeAgo: '15/05/2026  10:00',
     studentName: 'Sara Malik',
     rollNo: 'BBA-21-034',
     description:
@@ -159,7 +178,7 @@ const kAllComplaints = [
     category: 'General',
     priority: Priority.low,
     status: ComplaintStatus.pending,
-    timeAgo: '6h ago',
+    timeAgo: '14/05/2026  12:00',
     studentName: 'Ali Tariq',
     rollNo: 'CS-20-088',
     description:
@@ -173,7 +192,7 @@ const kAllComplaints = [
     category: 'Academic',
     priority: Priority.high,
     status: ComplaintStatus.resolved,
-    timeAgo: '1d ago',
+    timeAgo: '14/05/2026  11:00',
     studentName: 'Fatima Noor',
     rollNo: 'SE-22-019',
     description:
@@ -187,7 +206,7 @@ const kAllComplaints = [
     category: 'Transport',
     priority: Priority.high,
     status: ComplaintStatus.pending,
-    timeAgo: '8h ago',
+    timeAgo: '14/05/2026  10:00',
     studentName: 'Usman Ghani',
     rollNo: 'ME-21-055',
     description:
@@ -201,7 +220,7 @@ const kAllComplaints = [
     category: 'General',
     priority: Priority.medium,
     status: ComplaintStatus.inProgress,
-    timeAgo: '1d ago',
+    timeAgo: '13/05/2026  12:00',
     studentName: 'Zara Ahmed',
     rollNo: 'CS-22-033',
     description:
@@ -215,7 +234,7 @@ const kAllComplaints = [
     category: 'Academic',
     priority: Priority.low,
     status: ComplaintStatus.resolved,
-    timeAgo: '2d ago',
+    timeAgo: '13/05/2026  11:00',
     studentName: 'Omar Farooq',
     rollNo: 'LAW-21-012',
     description:
@@ -246,511 +265,20 @@ class _AdminRootState extends State<AdminRoot> {
       body: IndexedStack(
         index: _navIndex,
         children: [
+          // ← Now uses the SEPARATE admin_dashboard_screen.dart, not a local class
           AdminDashboardScreen(
             adminId: widget.adminId,
             onNavTap: _setNav,
-            navIndex: _navIndex,
           ),
           AdminComplaintsScreen(onNavTap: _setNav, navIndex: _navIndex),
           AdminAnalyticsScreen(onNavTap: _setNav, navIndex: _navIndex),
           AdminSettingsScreen(onNavTap: _setNav, navIndex: _navIndex),
         ],
       ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// SCREEN 1 — ADMIN DASHBOARD
-// ══════════════════════════════════════════════════════════════════════════════
-class AdminDashboardScreen extends StatefulWidget {
-  final String adminId;
-  final void Function(int) onNavTap;
-  final int navIndex;
-
-  const AdminDashboardScreen({
-    super.key,
-    required this.adminId,
-    required this.onNavTap,
-    required this.navIndex,
-  });
-
-  @override
-  State<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
-}
-
-class _AdminDashboardScreenState extends State<AdminDashboardScreen>
-    with TickerProviderStateMixin {
-  List<ComplaintItem> _liveComplaints = [];
-  bool _loading = true;
-  int _totalUsers = 0;
-
-  List<ComplaintItem> get _complaints =>
-      _liveComplaints.isNotEmpty ? _liveComplaints : kAllComplaints;
-
-  int get _total => _complaints.length;
-  int get _pending =>
-      _complaints.where((c) => c.status == ComplaintStatus.pending).length;
-  int get _inProgress =>
-      _complaints.where((c) => c.status == ComplaintStatus.inProgress).length;
-  int get _resolved =>
-      _complaints.where((c) => c.status == ComplaintStatus.resolved).length;
-  int get _high => _complaints.where((c) => c.priority == Priority.high).length;
-  int get _medium =>
-      _complaints.where((c) => c.priority == Priority.medium).length;
-  int get _low => _complaints.where((c) => c.priority == Priority.low).length;
-
-  List<ComplaintItem> get _recent => _complaints.take(4).toList();
-
-  Future<void> _fetchComplaints() async {
-    try {
-      final res = await http.get(Uri.parse('$baseUrl/api/admin/complaints'));
-      if (res.statusCode == 200 && mounted) {
-        final data = (jsonDecode(res.body) as List)
-            .map((e) => ComplaintItem.fromApi(e as Map<String, dynamic>))
-            .toList();
-        setState(() {
-          _liveComplaints = data;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _fetchOverview() async {
-    try {
-      final res = await http.get(Uri.parse('$baseUrl/api/admin/overview'));
-      if (res.statusCode == 200 && mounted) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        setState(() => _totalUsers = (data['total_users'] ?? 0) as int);
-      }
-    } catch (_) {}
-  }
-
-  late AnimationController _entryCtrl;
-  late Animation<double> _fadeIn;
-  late Animation<Offset> _slideUp;
-  late AnimationController _barCtrl;
-  late Animation<double> _highAnim, _medAnim, _lowAnim;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _entryCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeIn = CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut);
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut));
-
-    _barCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-    final maxVal = _high > 0 ? _high.toDouble() : 1.0;
-    _highAnim = Tween<double>(begin: 0, end: _high / maxVal).animate(
-      CurvedAnimation(
-        parent: _barCtrl,
-        curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
-      ),
-    );
-    _medAnim = Tween<double>(begin: 0, end: _medium / maxVal).animate(
-      CurvedAnimation(
-        parent: _barCtrl,
-        curve: const Interval(0.1, 0.8, curve: Curves.easeOut),
-      ),
-    );
-    _lowAnim = Tween<double>(begin: 0, end: _low / maxVal).animate(
-      CurvedAnimation(
-        parent: _barCtrl,
-        curve: const Interval(0.2, 0.9, curve: Curves.easeOut),
-      ),
-    );
-
-    _entryCtrl.forward();
-    _fetchComplaints();
-    _fetchOverview();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) _barCtrl.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _entryCtrl.dispose();
-    _barCtrl.dispose();
-    super.dispose();
-  }
-
-  void _goToComplaints({ComplaintStatus? filter}) => widget.onNavTap(1);
-
-  void _openDetail(ComplaintItem c) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AdminComplaintDetailScreen(complaint: c),
-      ),
-    ).then((_) {
-      _fetchComplaints();
-      _fetchOverview();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kSurface,
       bottomNavigationBar: AdminBottomNav(
-        activeIndex: widget.navIndex,
-        onTap: widget.onNavTap,
+        activeIndex: _navIndex,
+        onTap: _setNav,
       ),
-      body: FadeTransition(
-        opacity: _fadeIn,
-        child: SlideTransition(
-          position: _slideUp,
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : CustomScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  slivers: [
-                    _buildSliverHeader(),
-                    SliverPadding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      sliver: SliverList(
-                        delegate: SliverChildListDelegate([
-                          const SizedBox(height: 20),
-                          _buildStatGrid(),
-                          const SizedBox(height: 24),
-                          _buildPriorityCard(),
-                          const SizedBox(height: 24),
-                          _buildRecentSection(),
-                          const SizedBox(height: 30),
-                        ]),
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSliverHeader() {
-    return SliverAppBar(
-      expandedHeight: 130,
-      floating: false,
-      pinned: true,
-      elevation: 0,
-      backgroundColor: kDeepViolet,
-      automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.pin,
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [kDarkViolet, kDeepViolet],
-            ),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(22, 16, 22, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  kViolet.withAlpha(220),
-                                  kCyan.withAlpha(220),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.campaign_rounded,
-                              color: kWhite,
-                              size: 17,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          RichText(
-                            text: const TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Complaint',
-                                  style: TextStyle(
-                                    color: Color(0xFF80DEEA),
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: 'Desk',
-                                  style: TextStyle(
-                                    color: kWhite,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: '.AI',
-                                  style: TextStyle(
-                                    color: kWhite,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w300,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Stack(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: kWhite.withAlpha(25),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.notifications_outlined,
-                              color: kWhite,
-                              size: 20,
-                            ),
-                          ),
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFFF59E0B),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  // FIX: reduced from 14 → 7 to eliminate the 7px overflow.
-                  // This version added a "Registered users" row (+~13px) vs the
-                  // original, so halving this gap brings the column back within
-                  // the h=114 constraint of the FlexibleSpaceBar.
-                  const SizedBox(height: 7),
-                  const Text(
-                    'Dashboard',
-                    style: TextStyle(
-                      color: kWhite,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  const Text(
-                    'Welcome, Admin',
-                    style: TextStyle(color: Colors.white60, fontSize: 12.5),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Registered users: $_totalUsers',
-                    style: const TextStyle(color: Colors.white70, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatGrid() {
-    return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 14,
-      mainAxisSpacing: 14,
-      childAspectRatio: 1.55,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      children: [
-        _StatCard(
-          label: 'Total Complaints',
-          value: _total,
-          icon: Icons.description_outlined,
-          gradientColors: const [Color(0xFF00BCD4), Color(0xFF0097A7)],
-          iconBg: kWhite.withAlpha(45),
-          onTap: _goToComplaints,
-        ),
-        _StatCard(
-          label: 'Pending',
-          value: _pending,
-          icon: Icons.schedule_rounded,
-          gradientColors: const [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
-          iconBg: kWhite.withAlpha(45),
-          onTap: () => _goToComplaints(filter: ComplaintStatus.pending),
-        ),
-        _StatCard(
-          label: 'In Progress',
-          value: _inProgress,
-          icon: Icons.sync_rounded,
-          gradientColors: const [Color(0xFFF8F8F8), Color(0xFFEEEEEE)],
-          iconBg: kCyan.withAlpha(28),
-          darkText: true,
-          onTap: () => _goToComplaints(filter: ComplaintStatus.inProgress),
-        ),
-        _StatCard(
-          label: 'Resolved',
-          value: _resolved,
-          icon: Icons.check_circle_outline_rounded,
-          gradientColors: const [Color(0xFFF8F8F8), Color(0xFFEEEEEE)],
-          iconBg: kViolet.withAlpha(22),
-          darkText: true,
-          onTap: () => _goToComplaints(filter: ComplaintStatus.resolved),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPriorityCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kWhite,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: kViolet.withAlpha(14),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Priority Breakdown',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: kInkDark,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: kSurface,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'This Week',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: kInkLight,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          AnimatedBuilder(
-            animation: _barCtrl,
-            builder: (_, __) => Column(
-              children: [
-                _PriorityBar(
-                  label: 'High',
-                  count: _high,
-                  progress: _highAnim.value,
-                  color: const Color(0xFFEF4444),
-                ),
-                const SizedBox(height: 13),
-                _PriorityBar(
-                  label: 'Medium',
-                  count: _medium,
-                  progress: _medAnim.value,
-                  color: const Color(0xFFF59E0B),
-                ),
-                const SizedBox(height: 13),
-                _PriorityBar(
-                  label: 'Low',
-                  count: _low,
-                  progress: _lowAnim.value,
-                  color: const Color(0xFF22C55E),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecentSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Recent Complaints',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: kInkDark,
-                letterSpacing: -0.2,
-              ),
-            ),
-            GestureDetector(
-              onTap: _goToComplaints,
-              child: const Text(
-                'View all',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: kViolet,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 14),
-        ..._recent.map(
-          (c) => _DashComplaintTile(complaint: c, onTap: () => _openDetail(c)),
-        ),
-      ],
     );
   }
 }
@@ -836,8 +364,9 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
 
   List<ComplaintItem> get _filtered {
     var list = _complaints.toList();
-    if (_activeFilter != null)
+    if (_activeFilter != null) {
       list = list.where((c) => c.status == _activeFilter).toList();
+    }
     if (_searchQuery.isNotEmpty) {
       final q = _searchQuery.toLowerCase();
       list = list
@@ -870,10 +399,6 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: kSurface,
-      bottomNavigationBar: AdminBottomNav(
-        activeIndex: widget.navIndex,
-        onTap: widget.onNavTap,
-      ),
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SlideTransition(
@@ -1275,10 +800,12 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
   }
 
   ComplaintStatus? get _nextStatus {
-    if (_currentStatus == ComplaintStatus.pending)
+    if (_currentStatus == ComplaintStatus.pending) {
       return ComplaintStatus.inProgress;
-    if (_currentStatus == ComplaintStatus.inProgress)
+    }
+    if (_currentStatus == ComplaintStatus.inProgress) {
       return ComplaintStatus.resolved;
+    }
     return null;
   }
 
@@ -1289,10 +816,12 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
   }
 
   IconData get _actionIcon {
-    if (_currentStatus == ComplaintStatus.pending)
+    if (_currentStatus == ComplaintStatus.pending) {
       return Icons.play_arrow_rounded;
-    if (_currentStatus == ComplaintStatus.inProgress)
+    }
+    if (_currentStatus == ComplaintStatus.inProgress) {
       return Icons.check_circle_outline_rounded;
+    }
     return Icons.verified_rounded;
   }
 
@@ -1876,115 +1405,6 @@ class AdminBottomNav extends StatelessWidget {
 // SMALL REUSABLE WIDGETS
 // ══════════════════════════════════════════════════════════════════════════════
 
-class _DashComplaintTile extends StatelessWidget {
-  final ComplaintItem complaint;
-  final VoidCallback onTap;
-  const _DashComplaintTile({required this.complaint, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = complaint;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-        decoration: BoxDecoration(
-          color: kWhite,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              margin: const EdgeInsets.only(right: 12),
-              decoration: BoxDecoration(
-                color: c.priority.dot,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: c.priority.dot.withAlpha(100),
-                    blurRadius: 6,
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        c.id,
-                        style: const TextStyle(
-                          fontSize: 10.5,
-                          color: kInkLight,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: c.status.dot.withAlpha(22),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          c.status.label,
-                          style: TextStyle(
-                            fontSize: 9.5,
-                            color: c.status.dot,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    c.title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: kInkDark,
-                      letterSpacing: -0.1,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    '${c.category}  ·  ${c.timeAgo}',
-                    style: const TextStyle(fontSize: 11, color: kInkLight),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFFCCCCDD),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _ComplaintCard extends StatefulWidget {
   final ComplaintItem complaint;
   final VoidCallback onTap;
@@ -2099,7 +1519,7 @@ class _ComplaintCardState extends State<_ComplaintCard> {
                             ),
                             const SizedBox(width: 12),
                             const Icon(
-                              Icons.schedule_rounded,
+                              Icons.access_time_rounded,
                               size: 11,
                               color: kInkLight,
                             ),
@@ -2434,90 +1854,7 @@ class _IconBtn extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final int value;
-  final IconData icon;
-  final List<Color> gradientColors;
-  final Color iconBg;
-  final bool darkText;
-  final VoidCallback? onTap;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.gradientColors,
-    required this.iconBg,
-    this.darkText = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = darkText ? kInkDark : kWhite;
-    final subColor = darkText ? kInkLight : Colors.white70;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: gradientColors,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: gradientColors.first.withAlpha(darkText ? 14 : 60),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  value.toString(),
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                Container(
-                  width: 30,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(icon, size: 16, color: textColor),
-                ),
-              ],
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11.5,
-                color: subColor,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+// ignore: unused_element
 class _PriorityBar extends StatelessWidget {
   final String label;
   final int count;

@@ -95,6 +95,7 @@ class ComplaintItem {
 
     return ComplaintItem(
       id: '#C-${json['id']}',
+
       title: (json['description'] ?? 'Complaint').toString(),
       category: (json['category'] ?? 'General').toString(),
       priority: mapPriority(priorityRaw),

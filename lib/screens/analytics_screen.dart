@@ -23,12 +23,16 @@ const Color kVioletLight = Color(0xFFEDE8FF);
 // ══════════════════════════════════════════════════════════════════════════════
 class AdminAnalyticsScreen extends StatefulWidget {
   final void Function(int) onNavTap;
+  final ValueNotifier<int> refreshNotifier;
+  final void Function() onRefreshAll;
   final int navIndex;
 
   const AdminAnalyticsScreen({
     super.key,
     required this.onNavTap,
     required this.navIndex,
+    required this.refreshNotifier,
+    required this.onRefreshAll,
   });
 
   @override

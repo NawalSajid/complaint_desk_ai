@@ -115,6 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       SnackBar(
         content: Text(message),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: Color.fromARGB(255, 77, 21, 112),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       ),

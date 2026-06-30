@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element_parameter
+
 import 'package:flutter/material.dart';
 import 'package:complaint_desk_ai/screens/analytics_screen.dart';
 import 'package:complaint_desk_ai/screens/admin_setting_screen.dart';
@@ -60,6 +62,7 @@ class ComplaintItem {
   final String description;
   final String date;
   final String sortKey;
+  final bool userConfirmed;
 
   const ComplaintItem({
     required this.id,
@@ -73,19 +76,24 @@ class ComplaintItem {
     required this.description,
     required this.date,
     required this.sortKey,
+    this.userConfirmed = false,
   });
 
-  // ── Format ISO datetime to "dd/mm/yyyy  HH:mm" ───────────────────────────
+  // ── Format ISO datetime to "28 Jun 2026  23:54" ───────────────────────────
   static String _formatDateTime(String raw) {
     if (raw.isEmpty) return '—';
     try {
-      final dt    = DateTime.parse(raw).toLocal();
-      final day   = dt.day.toString().padLeft(2, '0');
-      final month = dt.month.toString().padLeft(2, '0');
-      final year  = dt.year.toString();
-      final hour  = dt.hour.toString().padLeft(2, '0');
-      final min   = dt.minute.toString().padLeft(2, '0');
-      return '$day/$month/$year  $hour:$min';
+      final dt = DateTime.parse(raw).toLocal();
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      final day  = dt.day.toString().padLeft(2, '0');
+      final mon  = months[dt.month - 1];
+      final year = dt.year.toString();
+      final hour = dt.hour.toString().padLeft(2, '0');
+      final min  = dt.minute.toString().padLeft(2, '0');
+      return '$day $mon $year  $hour:$min';
     } catch (_) {
       return raw;
     }
@@ -125,6 +133,7 @@ class ComplaintItem {
       description: (json['description'] ?? '').toString(),
       date: createdAt.split(' ').first,
       sortKey: createdAt,
+      userConfirmed: json['user_confirmed'] == true,
     );
   }
 }
@@ -136,7 +145,7 @@ const kAllComplaints = [
     category: 'Hostel',
     priority: Priority.high,
     status: ComplaintStatus.pending,
-    timeAgo: '15/05/2026  12:00',
+    timeAgo: '15 May 2026  12:00',
     studentName: 'Areeba Khan',
     rollNo: 'CS-21-045',
     description:
@@ -150,7 +159,7 @@ const kAllComplaints = [
     category: 'Hostel',
     priority: Priority.high,
     status: ComplaintStatus.pending,
-    timeAgo: '15/05/2026  11:00',
+    timeAgo: '15 May 2026  11:00',
     studentName: 'Hamza Raza',
     rollNo: 'EE-22-011',
     description:
@@ -164,7 +173,7 @@ const kAllComplaints = [
     category: 'General',
     priority: Priority.medium,
     status: ComplaintStatus.inProgress,
-    timeAgo: '15/05/2026  10:00',
+    timeAgo: '15 May 2026  10:00',
     studentName: 'Sara Malik',
     rollNo: 'BBA-21-034',
     description:
@@ -178,7 +187,7 @@ const kAllComplaints = [
     category: 'General',
     priority: Priority.low,
     status: ComplaintStatus.pending,
-    timeAgo: '14/05/2026  12:00',
+    timeAgo: '14 May 2026  12:00',
     studentName: 'Ali Tariq',
     rollNo: 'CS-20-088',
     description:
@@ -192,7 +201,7 @@ const kAllComplaints = [
     category: 'Academic',
     priority: Priority.high,
     status: ComplaintStatus.resolved,
-    timeAgo: '14/05/2026  11:00',
+    timeAgo: '14 May 2026  11:00',
     studentName: 'Fatima Noor',
     rollNo: 'SE-22-019',
     description:
@@ -206,7 +215,7 @@ const kAllComplaints = [
     category: 'Transport',
     priority: Priority.high,
     status: ComplaintStatus.pending,
-    timeAgo: '14/05/2026  10:00',
+    timeAgo: '14 May 2026  10:00',
     studentName: 'Usman Ghani',
     rollNo: 'ME-21-055',
     description:
@@ -220,7 +229,7 @@ const kAllComplaints = [
     category: 'General',
     priority: Priority.medium,
     status: ComplaintStatus.inProgress,
-    timeAgo: '13/05/2026  12:00',
+    timeAgo: '13 May 2026  12:00',
     studentName: 'Zara Ahmed',
     rollNo: 'CS-22-033',
     description:
@@ -234,7 +243,7 @@ const kAllComplaints = [
     category: 'Academic',
     priority: Priority.low,
     status: ComplaintStatus.resolved,
-    timeAgo: '13/05/2026  11:00',
+    timeAgo: '13 May 2026  11:00',
     studentName: 'Omar Farooq',
     rollNo: 'LAW-21-012',
     description:
@@ -257,7 +266,16 @@ class AdminRoot extends StatefulWidget {
 
 class _AdminRootState extends State<AdminRoot> {
   int _navIndex = 0;
+  final _refreshNotifier = ValueNotifier<int>(0);
+
   void _setNav(int i) => setState(() => _navIndex = i);
+  void _refreshAll() => _refreshNotifier.value++;
+
+  @override
+  void dispose() {
+    _refreshNotifier.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -265,14 +283,31 @@ class _AdminRootState extends State<AdminRoot> {
       body: IndexedStack(
         index: _navIndex,
         children: [
-          // ← Now uses the SEPARATE admin_dashboard_screen.dart, not a local class
           AdminDashboardScreen(
             adminId: widget.adminId,
             onNavTap: _setNav,
+            refreshNotifier: _refreshNotifier, 
+            onRefreshAll: _refreshAll,
           ),
-          AdminComplaintsScreen(onNavTap: _setNav, navIndex: _navIndex),
-          AdminAnalyticsScreen(onNavTap: _setNav, navIndex: _navIndex),
-          AdminSettingsScreen(onNavTap: _setNav, navIndex: _navIndex),
+
+          AdminComplaintsScreen(
+            onNavTap: _setNav,
+            navIndex: _navIndex,
+            refreshNotifier: _refreshNotifier,
+            onRefreshAll: _refreshAll,
+          ),
+          AdminAnalyticsScreen(
+            onNavTap: _setNav,
+            navIndex: _navIndex,
+            refreshNotifier: _refreshNotifier, 
+            onRefreshAll: _refreshAll,
+          ),
+          AdminSettingsScreen(
+            onNavTap: _setNav,
+            navIndex: _navIndex,
+            refreshNotifier: _refreshNotifier, 
+            onRefreshAll: _refreshAll,
+          ),
         ],
       ),
       bottomNavigationBar: AdminBottomNav(
@@ -289,11 +324,15 @@ class _AdminRootState extends State<AdminRoot> {
 class AdminComplaintsScreen extends StatefulWidget {
   final void Function(int) onNavTap;
   final int navIndex;
+  final ValueNotifier<int> refreshNotifier;
+  final VoidCallback onRefreshAll;
 
   const AdminComplaintsScreen({
     super.key,
     required this.onNavTap,
     required this.navIndex,
+    required this.refreshNotifier,
+    required this.onRefreshAll,
   });
 
   @override
@@ -323,20 +362,85 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
   List<ComplaintItem> _liveComplaints = [];
+  bool _isRefreshing = false;
 
   List<ComplaintItem> get _complaints =>
       _liveComplaints.isNotEmpty ? _liveComplaints : kAllComplaints;
 
-  Future<void> _fetchComplaints() async {
+  Future<void> _fetchComplaints({bool showFeedback = false}) async {
+    if (_isRefreshing) return;
+    if (mounted) setState(() => _isRefreshing = true);
     try {
       final res = await http.get(Uri.parse('$baseUrl/api/admin/complaints'));
-      if (res.statusCode == 200 && mounted) {
+      if (!mounted) return;
+      if (res.statusCode == 200) {
         final data = (jsonDecode(res.body) as List)
             .map((e) => ComplaintItem.fromApi(e as Map<String, dynamic>))
             .toList();
         setState(() => _liveComplaints = data);
+        if (showFeedback) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Complaints refreshed',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              backgroundColor: kViolet,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              margin: const EdgeInsets.all(16),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else if (showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Failed to refresh. Please try again.',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            backgroundColor: const Color.fromARGB(255, 77, 21, 112),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted && showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded),
+                
+                SizedBox(width: 8),
+                Text(
+                  'No connection. Showing cached data.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            backgroundColor: Color.fromARGB(255, 77, 21, 112),
+            
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            margin: const EdgeInsets.all(16),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
   }
 
   @override
@@ -352,11 +456,18 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut));
     _animCtrl.forward();
-    _fetchComplaints();
+    _fetchComplaints(showFeedback: false);
+    // Listen for global refresh triggered from the refresh button
+    widget.refreshNotifier.addListener(_onGlobalRefresh);
+  }
+
+  void _onGlobalRefresh() {
+    _fetchComplaints(showFeedback: false);
   }
 
   @override
   void dispose() {
+    widget.refreshNotifier.removeListener(_onGlobalRefresh);
     _animCtrl.dispose();
     _searchCtrl.dispose();
     super.dispose();
@@ -424,7 +535,7 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                                 complaint: _filtered[i],
                               ),
                             ),
-                          ).then((_) => _fetchComplaints()),
+                          ).then((_) => _fetchComplaints(showFeedback: false)),
                         ),
                       ),
               ),
@@ -519,6 +630,37 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                     _searchCtrl.clear();
                   }
                 }),
+              ),
+              const SizedBox(width: 8),
+              // ── REFRESH BUTTON ────────────────────────────────────────────
+              GestureDetector(
+                onTap: () {
+                  widget.onRefreshAll(); // triggers all other screens
+                  _fetchComplaints(showFeedback: true); // local fetch with feedback
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: _isRefreshing
+                        ? kViolet.withValues(alpha: 0.12)
+                        : kSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _isRefreshing ? kViolet : kBorder,
+                    ),
+                  ),
+                  child: _isRefreshing
+                      ? Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: kViolet,
+                          ),
+                        )
+                      : Icon(Icons.refresh_rounded, size: 18, color: kViolet),
+                ),
               ),
               const SizedBox(width: 8),
               _IconBtn(icon: Icons.tune_rounded, onTap: () {}),
@@ -826,13 +968,31 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
   }
 
   void _handleAction() {
-    if (_currentStatus == ComplaintStatus.inProgress &&
-        _remarksCtrl.text.trim().isEmpty) {
-      setState(() => _remarksError = true);
-      return;
-    }
-    if (_nextStatus != null) _updateStatusOnServer(_nextStatus!);
+  if (_remarksCtrl.text.trim().isEmpty) {
+    setState(() => _remarksError = true);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: const Color.fromARGB(255, 197, 56, 56), size: 24),
+            SizedBox(width: 12),
+            Expanded(child: Text('Please enter remarks before updating the status.')),
+          ],
+        ),
+        backgroundColor: Color.fromARGB(255, 77, 21, 112),
+      ),
+    );
+
+    return;
   }
+
+  setState(() => _remarksError = false);
+
+  if (_nextStatus != null) {
+    _updateStatusOnServer(_nextStatus!);
+  }
+}
 
   Future<void> _updateStatusOnServer(ComplaintStatus next) async {
     final status = next == ComplaintStatus.inProgress
@@ -1035,30 +1195,73 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
       child: Column(
         children: [
           _InfoRow(
-            icon: Icons.person_outline_rounded,
-            label: 'Student',
-            value: c.studentName,
-          ),
+  icon: Icons.person_outline_rounded,
+  label: 'Student',
+  value: c.studentName,
+),
+_Divider(),
+_InfoRow(
+  icon: Icons.badge_outlined,
+  label: 'Email',
+  value: c.rollNo,
+),
+_Divider(),
+_InfoRow(
+  icon: Icons.calendar_today_outlined,
+  label: 'Submitted',
+  value: c.timeAgo,
+),
           _Divider(),
-          _InfoRow(
-            icon: Icons.badge_outlined,
-            label: 'Roll No.',
-            value: c.rollNo,
-          ),
-          _Divider(),
-          _InfoRow(
-            icon: Icons.calendar_today_outlined,
-            label: 'Submitted',
-            value: c.date,
-          ),
-          _Divider(),
-          _InfoRow(
-            icon: Icons.flag_outlined,
-            label: 'Current Status',
-            value: _currentStatus.label,
-            valueColor: _currentStatus.fg,
-            valueBg: _currentStatus.bg,
-            isBadge: true,
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 9),
+            child: Row(
+              children: [
+                const Icon(Icons.flag_outlined, size: 15, color: kInkLight),
+                const SizedBox(width: 8),
+                const Text(
+                  'Current Status',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: kInkLight,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const Spacer(),
+                if (_currentStatus == ComplaintStatus.resolved && c.userConfirmed) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8F5EE),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: const Text(
+                      '✓ Confirmed by student',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A6640),
+                      ),
+                    ),
+                  ),
+                ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _currentStatus.bg,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    _currentStatus.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _currentStatus.fg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1147,7 +1350,7 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
               _SectionLabel(
                 text: isResolving
                     ? 'RESOLUTION REMARKS'
-                    : 'ADMIN REMARKS (OPTIONAL)',
+                    : 'ADMIN REMARKS',
               ),
               if (isResolving) ...[
                 const SizedBox(width: 4),
@@ -1206,7 +1409,7 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
             decoration: InputDecoration(
               hintText: isResolving
                   ? 'Describe what action was taken to resolve this complaint...'
-                  : 'Add a note or update (optional)...',
+                  : 'Add a note to update status',
               hintStyle: const TextStyle(fontSize: 12.5, color: kInkLight),
               filled: true,
               fillColor: _remarksError ? const Color(0xFFFFF0F0) : kSurface,
@@ -1464,30 +1667,41 @@ class _ComplaintCardState extends State<_ComplaintCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          children: [
-                            Text(
-                              c.id,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: kInkLight,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const Spacer(),
-                            _SmallBadge(
-                              label: c.priority.label,
-                              fg: c.priority.fg,
-                              bg: c.priority.bg,
-                            ),
-                            const SizedBox(width: 5),
-                            _SmallBadge(
-                              label: c.status.label,
-                              fg: c.status.fg,
-                              bg: c.status.bg,
-                            ),
-                          ],
-                        ),
+  children: [
+    Text(
+      c.id,
+      style: const TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        color: kInkLight,
+        letterSpacing: 0.3,
+      ),
+    ),
+    const Spacer(),
+    _SmallBadge(
+      label: c.priority.label,
+      fg: c.priority.fg,
+      bg: c.priority.bg,
+    ),
+    const SizedBox(width: 5),
+    _SmallBadge(
+      label: c.status.label,
+      fg: c.status.fg,
+      bg: c.status.bg,
+    ),
+    if (c.status == ComplaintStatus.resolved && c.userConfirmed) ...[
+      const SizedBox(width: 5),
+      const Tooltip(
+        message: 'Student confirmed this resolution',
+        child: Icon(
+          Icons.verified_rounded,
+          size: 16,
+          color: Color(0xFF0BAB64),
+        ),
+      ),
+    ],
+  ],
+),
                         const SizedBox(height: 6),
                         Text(
                           c.title,

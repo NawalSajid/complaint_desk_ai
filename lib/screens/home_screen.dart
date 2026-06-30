@@ -20,6 +20,12 @@ const LinearGradient _grad = LinearGradient(
   end: Alignment.bottomRight,
 );
 
+// Solid purple for active nav items
+const Color _navActivePurple = Color(0xFF5C35CC);
+
+// Ignore warning: function currently unused but kept for consistency with
+// profile_screen gradient helpers and potential future use.
+// ignore: unused_element
 Widget _gradMask({required Widget child}) => ShaderMask(
       blendMode: BlendMode.srcIn,
       shaderCallback: (b) => _grad.createShader(b),
@@ -38,7 +44,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   // ── Design tokens ──────────────────────────────────────────────────────────
-  static const Color _inkLight = Color(0xFFB0B0C0);
   static const Color _surface  = Color(0xFFF7F7FB);
   static const Color _white    = Colors.white;
 
@@ -355,7 +360,6 @@ class _HomeScreenState extends State<HomeScreen>
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      // Gradient border ring to match profile screen style
                       gradient: const LinearGradient(
                         colors: [_gradA, _gradB],
                         begin: Alignment.topLeft,
@@ -623,7 +627,8 @@ class _NewComplaintCardState extends State<_NewComplaintCard> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            // ── CHANGED: soft violet tint instead of plain white ──
+            color: const Color(0xFFF3EEFF),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: const Color(0xFF5C35CC).withValues(alpha: 0.2),
@@ -720,7 +725,7 @@ class _Badge extends StatelessWidget {
   }
 }
 
-// ── Bottom Navigation Bar (matches profile_screen gradient style) ──────────────
+// ── Bottom Navigation Bar ─────────────────────────────────────────────────────
 
 class _NavTab {
   final String   label;
@@ -787,17 +792,11 @@ class _BottomBar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: isActive
                     ? BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _gradA.withValues(alpha: 0.10),
-                            _gradB.withValues(alpha: 0.07),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        // ── CHANGED: solid purple tint background ──
+                        color: _navActivePurple.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: _gradA.withValues(alpha: 0.18),
+                          color: _navActivePurple.withValues(alpha: 0.18),
                           width: 1,
                         ),
                       )
@@ -807,31 +806,27 @@ class _BottomBar extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    isActive
-                        ? _gradMask(child: Icon(tab.activeIcon, size: 22, color: Colors.white))
-                        : Icon(tab.icon, size: 22, color: const Color(0xFFABABCC)),
+                    // ── CHANGED: solid purple icon, no gradient mask ──
+                    Icon(
+                      isActive ? tab.activeIcon : tab.icon,
+                      size: 22,
+                      color: isActive
+                          ? const Color(0xFF9C27B0)
+                          : const Color(0xFFABABCC),
+                    ),
                     const SizedBox(height: 3),
-                    isActive
-                        ? _gradMask(
-                            child: Text(
-                              tab.label.toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          )
-                        : Text(
-                            tab.label.toUpperCase(),
-                            style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFFABABCC),
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                    // ── CHANGED: solid purple label, no gradient mask ──
+                    Text(
+                      tab.label.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                        color: isActive
+                            ? _navActivePurple
+                            : const Color(0xFFABABCC),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ],
                 ),
               ),

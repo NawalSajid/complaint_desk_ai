@@ -13,21 +13,11 @@ import '../constants.dart';
 // ── Theme constants ───────────────────────────────────────────────────────────
 const Color _primary = Color.fromRGBO(156, 39, 176, 1);
 const Color _accent = Color.fromRGBO(0, 188, 212, 1);
-const Color _gradMid = Color(0xFF5C6BC0);
+// removed unused gradient mid color to resolve analyzer warning
 const Color _surface = Color(0xFFF7F7FB);
 const Color _cardBg = Colors.white;
 
-const LinearGradient _grad = LinearGradient(
-  colors: [_primary, _gradMid, _accent],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
-
-Widget _gradMask({required Widget child}) => ShaderMask(
-  blendMode: BlendMode.srcIn,
-  shaderCallback: (b) => _grad.createShader(b),
-  child: child,
-);
+// Gradient constant removed (unused) to resolve analyzer warning.
 
 class ComplaintsScreen extends StatefulWidget {
   final String userId;
@@ -414,15 +404,23 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
     final status = c['status'] ?? 'Pending';
     final time = formatDate(c['created_at'] ?? '');
 
+    // ── User confirmation flag (mirrors detail screen's parsing logic) ──────
+    final userConfirmed = c['user_confirmed'] == true ||
+        c['user_confirmed'] == 1 ||
+        c['user_confirmed'].toString() == 'true' ||
+        c['user_confirmed'].toString() == '1';
+
     final statusColor = _statusColor(status);
     final priorityColor = _priorityColor(priority);
     final iconData = _categoryIcon(title);
     final iconBgColor = _categoryColor(title);
 
+    
     String statusDisplay(String s) {
       switch (s.toLowerCase()) {
         case 'new':        return 'Pending';
         case 'inprogress': return 'In Progress';
+        case 'confirmed':  return 'Resolved';
         default:
           return s.split(' ').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
       }
@@ -498,6 +496,10 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                       ],
                     ),
                   ),
+                  if (userConfirmed) ...[
+                    const SizedBox(width: 6),
+                    _buildConfirmedBadge(),
+                  ],
                 ],
               ),
             ),
@@ -541,6 +543,19 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Confirmed badge (shown next to status pill once user confirmed) ───────
+
+  Widget _buildConfirmedBadge() {
+    return Tooltip(
+      message: 'You confirmed this resolution',
+      child: Icon(
+        Icons.verified_rounded,
+        size: 18,
+        color: const Color(0xFF0BAB64),
       ),
     );
   }
@@ -658,12 +673,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     isActive
-                        ? _gradMask(child: Icon(tab.activeIcon, size: 22, color: Colors.white))
+                        ? Icon(tab.activeIcon, size: 22, color: _primary)
                         : Icon(tab.icon, size: 22, color: const Color(0xFFABABCC)),
                     const SizedBox(height: 3),
                     isActive
-                        ? _gradMask(child: Text(tab.label.toUpperCase(),
-                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)))
+                        ? Text(tab.label.toUpperCase(),
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: _primary, letterSpacing: 0.5))
                         : Text(tab.label.toUpperCase(),
                             style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w500, color: Color(0xFFABABCC), letterSpacing: 0.5)),
                   ],
@@ -728,7 +743,8 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
   bool _confirming = false;
-  bool _loadingFresh = false;
+bool _loadingFresh = false;
+bool _userConfirmed = false;
 
   // ── Always use _complaint (fresh data), not widget.complaint ──────────────
   late Map<String, dynamic> _complaint;
@@ -738,7 +754,8 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
   void initState() {
     super.initState();
     _complaint = widget.complaint;
-    _currentStatus = (widget.complaint['status'] ?? 'Pending').toString();
+_currentStatus = (widget.complaint['status'] ?? 'Pending').toString();
+_userConfirmed = widget.complaint['user_confirmed'] == true;
 
     _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500));
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
@@ -763,7 +780,8 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
     try {
       final complaintId = widget.complaint['id'];
       final response = await http.get(
-        Uri.parse('$baseUrl/api/complaints?user_id=${widget.userId}'),
+        Uri.parse('$baseUrl/api/complaints?user_id=${widget.userId}&_t=${DateTime.now().millisecondsSinceEpoch}'),
+        headers: {'Cache-Control': 'no-cache'},
       );
       if (response.statusCode == 200 && mounted) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -772,9 +790,14 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
           orElse: () => null,
         );
         if (fresh != null && mounted) {
+          // debugPrint('🔍 Fresh complaint data: status=${fresh['status']}, user_confirmed=${fresh['user_confirmed']} (${fresh['user_confirmed'].runtimeType})');
           setState(() {
             _complaint = Map<String, dynamic>.from(fresh);
             _currentStatus = (fresh['status'] ?? 'Pending').toString();
+            _userConfirmed = fresh['user_confirmed'] == true ||
+                fresh['user_confirmed'] == 1 ||
+                fresh['user_confirmed'].toString() == 'true' ||
+                fresh['user_confirmed'].toString() == '1';
           });
         }
       }
@@ -835,7 +858,7 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
     switch (s.toLowerCase()) {
       case 'new':        return 'Pending';
       case 'inprogress': return 'In Progress';
-      case 'confirmed':  return 'Confirmed';
+      case 'confirmed':  return 'Resolved';
       default:
         return s.split(' ').map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}').join(' ');
     }
@@ -862,18 +885,40 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
         body: jsonEncode({'user_confirmed': true}),
       );
       if (response.statusCode == 200 && mounted) {
-        setState(() => _currentStatus = 'Confirmed');
-        widget.onConfirmed();
+  setState(() => _userConfirmed = true);
+  widget.onConfirmed();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Thank you! Resolution confirmed.',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-            backgroundColor: const Color(0xFF0BAB64),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
+  SnackBar(
+    behavior: SnackBarBehavior.floating,
+    backgroundColor: const Color(0xFF6A1B9A), // Purple
+    elevation: 8,
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(14),
+    ),
+    duration: const Duration(seconds: 3),
+    content: Row(
+      children: const [
+        Icon(
+          Icons.verified_rounded,
+          color: Colors.white,
+          size: 22,
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Thank you! Resolution confirmed.',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
           ),
-        );
+        ),
+      ],
+    ),
+  ),
+);
         Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -901,7 +946,7 @@ class _UserComplaintDetailScreenState extends State<UserComplaintDetailScreen>
     final createdAt = (c['created_at'] ?? '').toString();
     final adminRemark = (c['admin_remark'] ?? '').toString();
     final isResolved = _currentStatus.toLowerCase() == 'resolved';
-    final isConfirmed = _currentStatus.toLowerCase() == 'confirmed';
+    final isConfirmed = _userConfirmed;
     final statusColor = _statusColor(_currentStatus);
     final catColor = _categoryColor(category);
 

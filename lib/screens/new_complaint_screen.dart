@@ -122,7 +122,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
     if (!dummy && (category.isEmpty || description.isEmpty)) {
       _showSnackBar(
         message: 'Please select a category and enter a description.',
-        icon: Icons.info_outline_rounded,
+        icon: Icons.warning_amber_rounded,
         isError: true,
       );
       return;

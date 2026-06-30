@@ -9,10 +9,14 @@ import 'admin_complaint_screen.dart';
 class AdminDashboardScreen extends StatefulWidget {
   final String adminId;
   final void Function(int) onNavTap;
+  final ValueNotifier<int> refreshNotifier;
+  final void Function() onRefreshAll;
   const AdminDashboardScreen({
     super.key,
     required this.adminId,
     required this.onNavTap,
+    required this.refreshNotifier,
+    required this.onRefreshAll,
   });
 
   @override
@@ -38,6 +42,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
+    widget.refreshNotifier.addListener(_onRefresh); 
 
     _entryCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
@@ -46,17 +51,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         .animate(CurvedAnimation(parent: _entryCtrl, curve: Curves.easeOut));
 
     _entryCtrl.forward();
-    _fetchAll();
+    _fetchData();
   }
 
   @override
   void dispose() {
     _entryCtrl.dispose();
+    widget.refreshNotifier.removeListener(_onRefresh); 
     super.dispose();
   }
-
+  void _onRefresh() {          // ← ADD this method
+    _fetchData();
+  }
   // ── Fetch everything ───────────────────────────────────────────────────────
-  Future<void> _fetchAll() async {
+  Future<void> _fetchData() async {
     await _fetchComplaints();
     if (mounted) setState(() => _loading = false);
   }

@@ -1,5 +1,6 @@
 // ignore_for_file: curly_braces_in_flow_control_structures
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -39,6 +40,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   int  _high = 0, _medium = 0, _low = 0;
   List<ComplaintItem> _recentItems = [];
 
+  // ── Invisible auto-refresh ─────────────────────────────────────────────────
+  // Silently polls the server in the background so the dashboard stays in
+  // sync with new/updated complaints without showing any loading spinner
+  // or interrupting whatever the admin is doing.
+  Timer? _autoRefreshTimer;
+  static const Duration _autoRefreshInterval = Duration(seconds: 15);
+
   @override
   void initState() {
     super.initState();
@@ -52,12 +60,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
     _entryCtrl.forward();
     _fetchData();
+
+    // Start silent background polling. Uses _fetchComplaints() directly
+    // (not _fetchData) so _loading is never toggled and no spinner appears.
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      if (mounted) _fetchComplaints();
+    });
   }
 
   @override
   void dispose() {
     _entryCtrl.dispose();
-    widget.refreshNotifier.removeListener(_onRefresh); 
+    widget.refreshNotifier.removeListener(_onRefresh);
+    _autoRefreshTimer?.cancel();
     super.dispose();
   }
   void _onRefresh() {          // ← ADD this method
@@ -275,7 +290,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       crossAxisCount: 2,
       crossAxisSpacing: 14,
       mainAxisSpacing: 14,
-      childAspectRatio: 1.45,
+      childAspectRatio: 1.3,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
@@ -469,7 +484,7 @@ class _StatCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -477,12 +492,12 @@ class _StatCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      width: 34, height: 34,
+                      width: 30, height: 30,
                       decoration: BoxDecoration(
                         color: accentColor.withAlpha(darkText ? 22 : 50),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(icon, size: 17, color: iconColor),
+                      child: Icon(icon, size: 15, color: iconColor),
                     ),
                     Text(
                       value.toString(),
@@ -493,7 +508,7 @@ class _StatCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   label,
                   style: TextStyle(

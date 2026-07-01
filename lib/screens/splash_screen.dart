@@ -187,7 +187,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   text: 'Complaint',
                                   style: TextStyle(
                                     color: _accent,
-                                    fontSize: 36,
+                                    fontSize: 34,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: -0.5,
                                   ),
@@ -196,7 +196,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   text: 'Desk',
                                   style: TextStyle(
                                     color: _primary,
-                                    fontSize: 36,
+                                    fontSize: 34,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: -0.5,
                                   ),
@@ -205,7 +205,7 @@ class _SplashScreenState extends State<SplashScreen>
                                   text: '.AI',
                                   style: TextStyle(
                                     color: _primary,
-                                    fontSize: 36,
+                                    fontSize: 33,
                                     fontWeight: FontWeight.w300,
                                     letterSpacing: -0.5,
                                   ),

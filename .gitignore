@@ -32,7 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
-complaintdesk_ai_api/complaintDesk_model/model.safetensors
+# complaintdesk_ai_api/complaintDesk_model/model.safetensors
 
 # Symbolication related
 app.*.symbols

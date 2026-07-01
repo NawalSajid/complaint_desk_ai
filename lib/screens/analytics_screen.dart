@@ -42,8 +42,8 @@ class AdminAnalyticsScreen extends StatefulWidget {
 class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
     with TickerProviderStateMixin {
 
-  bool _showMonthly = false;
   bool _loading = true;
+  bool _refreshingManually = false; // ← ADDED: small header refresh button state
   List<ComplaintItem> _allComplaints = [];
 
   int get _total      => _allComplaints.length;
@@ -69,30 +69,6 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
     Color(0xFF059669), // green
     Color(0xFFD97706), // amber
   ];
-
-  // ── Weekly: last 4 weeks ──────────────────────────────────────────────────
-  List<double> get _weeklyBars {
-    final now = DateTime.now();
-    final buckets = List<double>.filled(4, 0);
-    bool anyParsed = false;
-    for (final c in _allComplaints) {
-      final parsed = _parseDate(c.date);
-      if (parsed == null) continue;
-      anyParsed = true;
-      final diffDays = now.difference(parsed).inDays.abs();
-      if (diffDays < 7) {
-        buckets[3]++;
-      // ignore: curly_braces_in_flow_control_structures
-      } else if (diffDays < 14) buckets[2]++;
-      else if (diffDays < 21) buckets[1]++;
-      else if (diffDays < 28) buckets[0]++;
-    }
-    if (!anyParsed) {
-      // Fallback demo data for weekly
-      return [3.0, 5.0, 4.0, 6.0];
-    }
-    return buckets;
-  }
 
   // ── Monthly: May, Jun, Jul, Aug ──────────────────────────────────────────
   // Fixed to always show May–Aug regardless of current date
@@ -148,11 +124,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
     return null;
   }
 
-  List<String> get _weeklyLabels => ['W1', 'W2', 'W3', 'W4'];
   List<String> get _monthlyLabels => ['May', 'Jun', 'Jul', 'Aug'];
 
-  List<double>  get _bars   => _showMonthly ? _monthlyBars : _weeklyBars;
-  List<String>  get _bLabel => _showMonthly ? _monthlyLabels : _weeklyLabels;
+  List<double>  get _bars   => _monthlyBars;
+  List<String>  get _bLabel => _monthlyLabels;
 
   // Category colors
   static const _catColors = [
@@ -200,6 +175,65 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
         _pieCtrl.forward();
       }
     });
+
+    // ── Invisible auto-refresh ─────────────────────────────────────────────
+    // Whenever the shared refreshNotifier's value changes (e.g. another
+    // screen creates/updates/deletes a complaint), silently re-fetch data
+    // here with no loading spinner or visible UI change.
+    widget.refreshNotifier.addListener(_onExternalRefresh);
+  }
+
+  void _onExternalRefresh() {
+    _silentRefresh();
+  }
+
+  // Re-fetches complaints without toggling the full-screen loading state,
+  // so the refresh is invisible to the user. Chart/pie animations replay
+  // smoothly since setState just swaps the underlying data.
+  Future<void> _silentRefresh() async {
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/admin/complaints'));
+      if (res.statusCode == 200 && mounted) {
+        final data = (jsonDecode(res.body) as List)
+            .map((e) => ComplaintItem.fromApi(e as Map<String, dynamic>))
+            .toList();
+        if (!mounted) return;
+        setState(() {
+          _allComplaints = data;
+        });
+        // Replay chart animations so the new values animate in smoothly.
+        _barCtrl..reset()..forward();
+        _buildBarAnims();
+        _pieCtrl..reset()..forward();
+      }
+    } catch (_) {
+      // Silent failure — no error UI, since this is a background refresh.
+    }
+  }
+
+  // ── Manual refresh (triggered by the small button in the header) ──────────
+  // Unlike _fetchComplaints(), this does NOT show the full-screen loader —
+  // only the small button shows a spinner, keeping the rest of the screen
+  // visible while fresh data loads.
+  Future<void> _manualRefresh() async {
+    if (_refreshingManually) return;
+    setState(() => _refreshingManually = true);
+    try {
+      final res = await http.get(Uri.parse('$baseUrl/api/admin/complaints'));
+      if (res.statusCode == 200 && mounted) {
+        final data = (jsonDecode(res.body) as List)
+            .map((e) => ComplaintItem.fromApi(e as Map<String, dynamic>))
+            .toList();
+        setState(() => _allComplaints = data);
+        _barCtrl..reset()..forward();
+        _buildBarAnims();
+        _pieCtrl..reset()..forward();
+      }
+    } catch (_) {
+      // Silent failure — keep last known data on screen.
+    } finally {
+      if (mounted) setState(() => _refreshingManually = false);
+    }
   }
 
   void _buildBarAnims() {
@@ -237,14 +271,9 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
     return entries.take(6).toList();
   }
 
-  void _switchPeriod(bool monthly) {
-    setState(() => _showMonthly = monthly);
-    _barCtrl..reset()..forward();
-    _buildBarAnims();
-  }
-
   @override
   void dispose() {
+    widget.refreshNotifier.removeListener(_onExternalRefresh);
     _entryCtrl.dispose();
     _barCtrl.dispose();
     _pieCtrl.dispose();
@@ -333,21 +362,48 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
                           const Text('Analytics',
                               style: TextStyle(color: kWhite, fontSize: 22,
                                   fontWeight: FontWeight.bold, letterSpacing: -0.5)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: kCyan.withAlpha(40),
-                              borderRadius: BorderRadius.circular(99),
-                              border: Border.all(color: kCyan.withAlpha(80)),
-                            ),
-                            child: Row(mainAxisSize: MainAxisSize.min, children: [
-                              const Icon(Icons.check_circle_outline_rounded,
-                                  color: Color(0xFF80DEEA), size: 12),
-                              const SizedBox(width: 4),
-                              Text('$resRate% resolved',
-                                  style: const TextStyle(color: Color(0xFF80DEEA),
-                                      fontSize: 11, fontWeight: FontWeight.bold)),
-                            ]),
+                          // ← ADDED: small refresh button placed before the "% resolved" chip
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: _refreshingManually ? null : _manualRefresh,
+                                child: Container(
+                                  width: 30,
+                                  height: 30,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: kWhite.withAlpha(18),
+                                    borderRadius: BorderRadius.circular(9),
+                                    border: Border.all(color: kWhite.withAlpha(30)),
+                                  ),
+                                  child: _refreshingManually
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(7),
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2, color: kWhite),
+                                        )
+                                      : const Icon(Icons.refresh_rounded,
+                                          size: 16, color: kWhite),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: kCyan.withAlpha(40),
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(color: kCyan.withAlpha(80)),
+                                ),
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  const Icon(Icons.check_circle_outline_rounded,
+                                      color: Color(0xFF80DEEA), size: 12),
+                                  const SizedBox(width: 4),
+                                  Text('$resRate% resolved',
+                                      style: const TextStyle(color: Color(0xFF80DEEA),
+                                          fontSize: 11, fontWeight: FontWeight.bold)),
+                                ]),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -389,27 +445,10 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Flexible(
-                child: Text('Complaints over time',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
-                        color: kInkDark, letterSpacing: -0.2),
-                    overflow: TextOverflow.ellipsis),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(color: kSurface,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kBorder)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  _PeriodBtn(label: 'Weekly',  active: !_showMonthly, onTap: () => _switchPeriod(false)),
-                  _PeriodBtn(label: 'Monthly', active: _showMonthly,  onTap: () => _switchPeriod(true)),
-                ]),
-              ),
-            ],
-          ),
+          const Text('Complaints over time',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold,
+                  color: kInkDark, letterSpacing: -0.2),
+              overflow: TextOverflow.ellipsis),
           const SizedBox(height: 20),
           AnimatedBuilder(
             animation: _barCtrl,
@@ -996,32 +1035,6 @@ class _StatChip extends StatelessWidget {
           Text(label, textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 9, color: Colors.white60, height: 1.2)),
         ]),
-      ),
-    );
-  }
-}
-
-class _PeriodBtn extends StatelessWidget {
-  final String label;
-  final bool   active;
-  final VoidCallback onTap;
-
-  const _PeriodBtn({required this.label, required this.active, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: active ? kViolet : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                color: active ? kWhite : kInkLight)),
       ),
     );
   }

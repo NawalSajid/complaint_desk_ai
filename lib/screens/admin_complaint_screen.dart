@@ -533,6 +533,7 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                             MaterialPageRoute(
                               builder: (_) => AdminComplaintDetailScreen(
                                 complaint: _filtered[i],
+                                onStatusChanged: widget.onRefreshAll, 
                               ),
                             ),
                           ).then((_) => _fetchComplaints(showFeedback: false)),
@@ -546,6 +547,12 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
     );
   }
 
+  // ── FIXED: app bar no longer overflows on narrow screens ──────────────────
+  // Changes made:
+  //   1. Logo + title wrapped in Expanded/Flexible so it shrinks instead of
+  //      pushing icons off-screen; title truncates with ellipsis if needed.
+  //   2. Removed the unused "tune" icon button (it had no onTap behavior).
+  //   3. Reduced spacing between action icons slightly.
   Widget _buildAppBar() {
     return Container(
       color: kWhite,
@@ -559,66 +566,77 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           child: Row(
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      kViolet.withValues(alpha: 0.85),
-                      kCyan.withValues(alpha: 0.85),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kViolet.withValues(alpha: 0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            kViolet.withValues(alpha: 0.85),
+                            kCyan.withValues(alpha: 0.85),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kViolet.withValues(alpha: 0.25),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.campaign_rounded,
+                        color: kWhite,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: RichText(
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        text: const TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Complaint',
+                              style: TextStyle(
+                                color: kCyan,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            TextSpan(
+                              text: 'Desk',
+                              style: TextStyle(
+                                color: kViolet,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            TextSpan(
+                              text: '.AI',
+                              style: TextStyle(
+                                color: kViolet,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w300,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                child: const Icon(
-                  Icons.campaign_rounded,
-                  color: kWhite,
-                  size: 18,
                 ),
               ),
               const SizedBox(width: 8),
-              RichText(
-                text: const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Complaint',
-                      style: TextStyle(
-                        color: kCyan,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Desk',
-                      style: TextStyle(
-                        color: kViolet,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '.AI',
-                      style: TextStyle(
-                        color: kViolet,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w300,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
               _IconBtn(
                 icon: _showSearch
                     ? Icons.search_off_rounded
@@ -662,8 +680,6 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                       : Icon(Icons.refresh_rounded, size: 18, color: kViolet),
                 ),
               ),
-              const SizedBox(width: 8),
-              _IconBtn(icon: Icons.tune_rounded, onTap: () {}),
             ],
           ),
         ),
@@ -722,6 +738,12 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
     );
   }
 
+  // ── FIXED: filter row header no longer overflows ──────────────────────────
+  // Changes made:
+  //   1. "ALL COMPLAINTS" label wrapped in Flexible with ellipsis.
+  //   2. Result count text wrapped so it won't force overflow on tiny widths.
+  //   3. Sort dropdown kept, but row now uses mainAxisSize control correctly
+  //      so nothing gets pushed past the screen edge.
   Widget _buildFilterRow() {
     final filters = <String, ComplaintStatus?>{
       'All': null,
@@ -747,25 +769,31 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  'ALL COMPLAINTS',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: kViolet,
-                    letterSpacing: 1.5,
+                Flexible(
+                  child: Text(
+                    'ALL COMPLAINTS',
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: kViolet,
+                      letterSpacing: 1.5,
+                    ),
                   ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 6),
                 Text(
                   '${_filtered.length} results',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w500,
                     color: kInkLight,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
@@ -901,7 +929,8 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen>
 // ══════════════════════════════════════════════════════════════════════════════
 class AdminComplaintDetailScreen extends StatefulWidget {
   final ComplaintItem complaint;
-  const AdminComplaintDetailScreen({super.key, required this.complaint});
+   final VoidCallback? onStatusChanged;  
+  const AdminComplaintDetailScreen({super.key, required this.complaint, this.onStatusChanged});
 
   @override
   State<AdminComplaintDetailScreen> createState() =>
@@ -1020,6 +1049,7 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
           _currentStatus = next;
           _remarksError = false;
         });
+        widget.onStatusChanged?.call();  
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -1034,6 +1064,7 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
             margin: const EdgeInsets.all(16),
           ),
         );
+        widget.onStatusChanged?.call();
         Navigator.pop(context, true);
       }
     } catch (_) {}
@@ -1165,21 +1196,30 @@ class _AdminComplaintDetailScreenState extends State<AdminComplaintDetailScreen>
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      _HeroBadge(
-                        icon: Icons.category_outlined,
-                        label: c.category,
-                        color: kCyan.withValues(alpha: 0.35),
-                      ),
-                      const SizedBox(width: 8),
-                      _HeroBadge(
-                        icon: Icons.warning_amber_rounded,
-                        label: '${c.priority.label} Priority',
-                        color: kWhite.withValues(alpha: 0.18),
-                      ),
-                    ],
-                  ),
+                 
+                 Wrap(
+  spacing: 8,
+  runSpacing: 8,
+  crossAxisAlignment: WrapCrossAlignment.center,
+  children: [
+    _HeroBadge(
+      icon: Icons.category_outlined,
+      label: c.category,
+      color: kCyan.withValues(alpha: 0.35),
+    ),
+    _HeroBadge(
+      icon: Icons.warning_amber_rounded,
+      label: '${c.priority.label} Priority',
+      color: kWhite.withValues(alpha: 0.18),
+    ),
+    if (_currentStatus == ComplaintStatus.resolved && c.userConfirmed)
+      _HeroBadge(
+        icon: Icons.verified_rounded,
+        label: '✓ Confirmed by student',
+        color: const Color(0xFF1A6640).withValues(alpha: 0.35),
+      ),
+  ],
+),
                 ],
               ),
             ),
@@ -1235,14 +1275,7 @@ _InfoRow(
                       color: const Color(0xFFE8F5EE),
                       borderRadius: BorderRadius.circular(99),
                     ),
-                    child: const Text(
-                      '✓ Confirmed by student',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1A6640),
-                      ),
-                    ),
+                   
                   ),
                 ],
                 Container(
@@ -1936,12 +1969,17 @@ class _InfoRow extends StatelessWidget {
                     ),
                   ),
                 )
-              : Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kInkDark,
+              : Flexible(
+                  child: Text(
+                    value,
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kInkDark,
+                    ),
                   ),
                 ),
         ],

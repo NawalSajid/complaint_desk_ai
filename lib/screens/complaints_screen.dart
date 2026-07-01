@@ -13,11 +13,8 @@ import '../constants.dart';
 // ── Theme constants ───────────────────────────────────────────────────────────
 const Color _primary = Color.fromRGBO(156, 39, 176, 1);
 const Color _accent = Color.fromRGBO(0, 188, 212, 1);
-// removed unused gradient mid color to resolve analyzer warning
 const Color _surface = Color(0xFFF7F7FB);
 const Color _cardBg = Colors.white;
-
-// Gradient constant removed (unused) to resolve analyzer warning.
 
 class ComplaintsScreen extends StatefulWidget {
   final String userId;
@@ -169,85 +166,97 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                       _buildAddButton(),
                       const SizedBox(height: 28),
 
+                      // ── Section label (own line) ─────────────────────
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 3,
-                                height: 16,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [_primary, _accent],
-                                  ),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
+                          Container(
+                            width: 3,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [_primary, _accent],
                               ),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'RECENT COMPLAINTS',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: _primary,
-                                  letterSpacing: 1.5,
-                                ),
-                              ),
-                            ],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
-                                decoration: BoxDecoration(
-                                  color: _primary.withValues(alpha: 0.07),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: _sortOption,
-                                    icon: const Icon(Icons.swap_vert_rounded,
-                                        size: 14, color: _primary),
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: _primary),
-                                    isDense: true,
-                                    onChanged: (v) {
-                                      if (v != null)
-                                        setState(() => _sortOption = v);
-                                    },
-                                    items: const [
-                                      DropdownMenuItem(value: 'Recent', child: Text('Recent')),
-                                      DropdownMenuItem(value: 'Oldest', child: Text('Oldest')),
-                                      DropdownMenuItem(value: 'Priority: High to Low', child: Text('Priority: High to Low')),
-                                      DropdownMenuItem(value: 'Priority: Low to High', child: Text('Priority: Low to High')),
-                                    ],
-                                  ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'RECENT COMPLAINTS',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _primary,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // ── Sort + refresh (own line, right-aligned) ─────
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Flexible(
+                            child: Container(
+                              constraints: const BoxConstraints(maxWidth: 160),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: _primary.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _sortOption,
+                                  icon: const Icon(Icons.swap_vert_rounded,
+                                      size: 14, color: _primary),
+                                  isDense: true,
+                                  isExpanded: true,
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: _primary),
+                                  onChanged: (v) {
+                                    if (v != null)
+                                      setState(() => _sortOption = v);
+                                  },
+                                  // Short label when the dropdown is closed —
+                                  // this is what actually stops the overflow.
+                                  selectedItemBuilder: (context) => const [
+                                    Text('Recent', overflow: TextOverflow.ellipsis),
+                                    Text('Oldest', overflow: TextOverflow.ellipsis),
+                                    Text('Priority ↓', overflow: TextOverflow.ellipsis),
+                                    Text('Priority ↑', overflow: TextOverflow.ellipsis),
+                                  ],
+                                  items: const [
+                                    DropdownMenuItem(value: 'Recent', child: Text('Recent')),
+                                    DropdownMenuItem(value: 'Oldest', child: Text('Oldest')),
+                                    DropdownMenuItem(
+                                        value: 'Priority: High to Low',
+                                        child: Text('Priority: High to Low')),
+                                    DropdownMenuItem(
+                                        value: 'Priority: Low to High',
+                                        child: Text('Priority: Low to High')),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: fetchComplaints,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: _primary.withValues(alpha: 0.07),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Row(
-                                    children: const [
-                                      Icon(Icons.refresh_rounded, size: 13, color: _primary),
-                                      SizedBox(width: 4),
-                                      Text('Refresh', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _primary)),
-                                    ],
-                                  ),
-                                ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: fetchComplaints,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _primary.withValues(alpha: 0.07),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ],
+                              child: const Icon(Icons.refresh_rounded, size: 16, color: _primary),
+                            ),
                           ),
                         ],
                       ),
@@ -307,26 +316,30 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [_primary, _accent],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ).createShader(bounds),
-                    child: const Text(
-                      'My Complaints',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -0.4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [_primary, _accent],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(bounds),
+                      child: const Text(
+                        'My Complaints',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white, letterSpacing: -0.4),
+                      ),
                     ),
-                  ),
-                  const Text('Manage your submissions',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF9090A0))),
-                ],
+                    const Text('Manage your submissions',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11, color: Color(0xFF9090A0))),
+                  ],
+                ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
@@ -410,14 +423,20 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
         c['user_confirmed'].toString() == 'true' ||
         c['user_confirmed'].toString() == '1';
 
-    final statusColor = _statusColor(status);
+    // NOTE: statusColor/statusDisplay now depend on userConfirmed too,
+    // so a resolved-but-unconfirmed complaint doesn't show as "done" (green).
+    final statusColor = _statusColor(status, userConfirmed);
     final priorityColor = _priorityColor(priority);
     final iconData = _categoryIcon(title);
     final iconBgColor = _categoryColor(title);
 
-    
-    String statusDisplay(String s) {
-      switch (s.toLowerCase()) {
+    String statusDisplay(String s, bool confirmed) {
+      final v = s.toLowerCase();
+      // Resolved by admin but student hasn't confirmed yet — don't call it "Resolved".
+      if ((v == 'resolved' || v == 'confirmed') && !confirmed) {
+        return 'Awaiting Confirmation';
+      }
+      switch (v) {
         case 'new':        return 'Pending';
         case 'inprogress': return 'In Progress';
         case 'confirmed':  return 'Resolved';
@@ -455,8 +474,12 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Card top
+            // ── FIXED: status pill pushed fully to the right edge ────────
+            // Right-side padding trimmed to almost nothing (16 → 2) and the
+            // status pill + checkmark are wrapped in their own Row so they
+            // hug the edge as a single group, regardless of title length.
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 14, 2, 12),
               decoration: BoxDecoration(
                 color: _primary.withValues(alpha: 0.03),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
@@ -476,30 +499,40 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(title,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF1A1A2E), letterSpacing: -0.2)),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(width: 5, height: 5,
-                            decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
-                        const SizedBox(width: 5),
-                        Text(statusDisplay(status),
-                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
+                  const SizedBox(width: 6),
+                  // Status pill (+ confirmed checkmark) grouped into one
+                  // Row so they move together and sit flush at the edge.
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(width: 5, height: 5,
+                                decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)),
+                            const SizedBox(width: 5),
+                            Text(statusDisplay(status, userConfirmed),
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor)),
+                          ],
+                        ),
+                      ),
+                      if (userConfirmed) ...[
+                        const SizedBox(width: 6),
+                        _buildConfirmedBadge(),
                       ],
-                    ),
+                    ],
                   ),
-                  if (userConfirmed) ...[
-                    const SizedBox(width: 6),
-                    _buildConfirmedBadge(),
-                  ],
                 ],
               ),
             ),
@@ -693,13 +726,20 @@ class _ComplaintsScreenState extends State<ComplaintsScreen>
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
+  // `confirmed` = whether the student has confirmed a resolved complaint.
+  // A resolved-but-unconfirmed complaint gets its own color (purple, matches
+  // app brand) instead of the "done" green, so it doesn't look finished yet.
+  Color _statusColor(String status, bool confirmed) {
+    final v = status.toLowerCase();
+    if ((v == 'resolved' || v == 'confirmed') && !confirmed) {
+      return _primary;
+    }
+    switch (v) {
       case 'pending':
       case 'new':        return const Color(0xFFE67E22);
-      case 'resolved':   return const Color(0xFF0BAB64);
-      case 'rejected':   return const Color(0xFFE84393);
+      case 'resolved':
       case 'confirmed':  return const Color(0xFF0BAB64);
+      case 'rejected':   return const Color(0xFFE84393);
       case 'in progress':
       case 'inprogress': return const Color(0xFF2979FF);
       default:           return _primary;
@@ -790,7 +830,6 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
           orElse: () => null,
         );
         if (fresh != null && mounted) {
-          // debugPrint('🔍 Fresh complaint data: status=${fresh['status']}, user_confirmed=${fresh['user_confirmed']} (${fresh['user_confirmed'].runtimeType})');
           setState(() {
             _complaint = Map<String, dynamic>.from(fresh);
             _currentStatus = (fresh['status'] ?? 'Pending').toString();
@@ -810,11 +849,16 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  Color _statusColor(String s) {
-    switch (s.toLowerCase()) {
+  // `confirmed` = whether the student has confirmed a resolved complaint.
+  Color _statusColor(String s, bool confirmed) {
+    final v = s.toLowerCase();
+    if ((v == 'resolved' || v == 'confirmed') && !confirmed) {
+      return _primary;
+    }
+    switch (v) {
       case 'pending':
       case 'new':        return const Color(0xFFE67E22);
-      case 'resolved':   return const Color(0xFF0BAB64);
+      case 'resolved':
       case 'confirmed':  return const Color(0xFF0BAB64);
       case 'rejected':   return const Color(0xFFE84393);
       case 'in progress':
@@ -854,8 +898,14 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
     }
   }
 
-  String _statusDisplay(String s) {
-    switch (s.toLowerCase()) {
+  // `confirmed` = whether the student has confirmed a resolved complaint.
+  String _statusDisplay(String s, bool confirmed) {
+    final v = s.toLowerCase();
+    // Resolved by admin but student hasn't confirmed yet — don't call it "Resolved".
+    if ((v == 'resolved' || v == 'confirmed') && !confirmed) {
+      return 'Awaiting Confirmation';
+    }
+    switch (v) {
       case 'new':        return 'Pending';
       case 'inprogress': return 'In Progress';
       case 'confirmed':  return 'Resolved';
@@ -947,7 +997,7 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
     final adminRemark = (c['admin_remark'] ?? '').toString();
     final isResolved = _currentStatus.toLowerCase() == 'resolved';
     final isConfirmed = _userConfirmed;
-    final statusColor = _statusColor(_currentStatus);
+    final statusColor = _statusColor(_currentStatus, _userConfirmed);
     final catColor = _categoryColor(category);
 
     return Scaffold(
@@ -1002,7 +1052,7 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
                                   _InfoRow(
                                     icon: Icons.info_outline_rounded,
                                     label: 'Current Status',
-                                    value: _statusDisplay(_currentStatus),
+                                    value: _statusDisplay(_currentStatus, _userConfirmed),
                                     valueColor: statusColor,
                                     valueBg: statusColor.withValues(alpha: 0.1),
                                     isBadge: true,
@@ -1220,7 +1270,7 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1250,32 +1300,37 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
                         child: Icon(_categoryIcon(category), color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(category,
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
-                                  color: Colors.white, letterSpacing: -0.4)),
-                          Text('Complaint Details',
-                              style: TextStyle(fontSize: 12,
-                                  color: Colors.white.withValues(alpha: 0.65))),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(category,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700,
+                                    color: Colors.white, letterSpacing: -0.4)),
+                            Text('Complaint Details',
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 12,
+                                    color: Colors.white.withValues(alpha: 0.65))),
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
                       _HeroBadge(
                         icon: Icons.warning_amber_rounded,
                         label: '$priority Priority',
                         color: Colors.white.withValues(alpha: 0.18),
                       ),
-                      const SizedBox(width: 8),
                       _HeroBadge(
                         icon: Icons.info_outline_rounded,
-                        label: _statusDisplay(_currentStatus),
-                        color: _statusColor(_currentStatus).withValues(alpha: 0.35),
+                        label: _statusDisplay(_currentStatus, _userConfirmed),
+                        color: _statusColor(_currentStatus, _userConfirmed).withValues(alpha: 0.35),
                       ),
                     ],
                   ),
@@ -1370,9 +1425,18 @@ _userConfirmed = widget.complaint['user_confirmed'] == true;
     }
   }
 
+  // The "Resolved" step (rank 2) only becomes fully "done" once the student
+  // has confirmed. Until then, it shows as the current/active step — signaling
+  // "reached, but waiting on you" instead of "finished".
   _StepState _stepState(String step) {
     final cur = _statusRank(_currentStatus);
     final stp = _statusRank(step);
+
+    if (stp == 2) {
+      if (cur < 2) return _StepState.upcoming;
+      return _userConfirmed ? _StepState.done : _StepState.active;
+    }
+
     if (cur == stp) return _StepState.active;
     if (cur > stp)  return _StepState.done;
     return _StepState.upcoming;

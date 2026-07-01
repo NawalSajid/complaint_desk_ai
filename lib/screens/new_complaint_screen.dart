@@ -67,7 +67,10 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
   ];
 
   String selectedCategory = '';
-  String? _fileName;
+
+  // ── Real picked file (bytes-backed, works on Web + mobile) ────────────────
+  PlatformFile? _pickedFile;
+
   final TextEditingController descriptionController = TextEditingController();
   bool isSubmitting = false;
 
@@ -103,16 +106,24 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
     super.dispose();
   }
 
-  // ── BACKEND LOGIC — UNTOUCHED ─────────────────────────────────────────────
+  // ── BACKEND LOGIC ─────────────────────────────────────────────────────────
 
   Future<void> _pickFile() async {
+    // withData: true ensures bytes are populated on Flutter Web (where .path
+    // is always null), so the file is genuinely captured, not just its name.
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['jpg', 'pdf', 'doc', 'png'],
+      allowedExtensions: ['jpg', 'png', 'pdf', 'doc', 'docx'],
+      withData: true,
     );
-    if (result != null) {
-      setState(() => _fileName = result.files.single.name);
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _pickedFile = result.files.single);
     }
+  }
+
+  // ── Cancel / remove the attached document ──────────────────────────────────
+  void _removeFile() {
+    setState(() => _pickedFile = null);
   }
 
   Future<void> submitComplaint({bool dummy = false}) async {
@@ -138,7 +149,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
           'user_id': int.parse(widget.userId),
           'category': category,
           'description': description,
-          'document': _fileName ?? '',
+          'document': _pickedFile?.name ?? '',
         }),
       );
 
@@ -308,15 +319,15 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                 children: [
                   _NavBackButton(onTap: () => Navigator.pop(context)),
                   const SizedBox(width: 14),
-                  _BrandTitle(),
+                  const _BrandTitle(),
                   const Spacer(),
-                  _HeaderBadge(),
+                  const _HeaderBadge(),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-              child: _HeroCard(),
+              child: const _HeroCard(),
             ),
           ],
         ),
@@ -358,6 +369,10 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
   }
 
   // ── Category Grid ─────────────────────────────────────────────────────────
+  // FIX: childAspectRatio lowered (0.92 → 0.78) to give tiles more vertical
+  // room. On real devices with different font-scaling/DPI, the old ratio was
+  // just barely too short for icon + label + 2-line subtitle, causing the
+  // "BOTTOM OVERFLOWED BY N PIXELS" banner seen in testing.
 
   Widget _buildCategoryGrid() {
     return GridView.count(
@@ -366,7 +381,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
       crossAxisCount: 3,
       crossAxisSpacing: 10,
       mainAxisSpacing: 10,
-      childAspectRatio: 0.92,
+      childAspectRatio: 0.78,
       children: _categories
           .map((c) => _CategoryTile(
                 meta: c,
@@ -512,10 +527,14 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
     );
   }
 
-  // ── Attachment Section (redesigned) ───────────────────────────────────────
+  // ── Attachment Section ────────────────────────────────────────────────────
+  // FIX: the title/subtitle Column is now wrapped in Expanded so it can never
+  // push the trailing "Optional" chip / close button past the right edge.
+  // Long file names now truncate with an ellipsis instead of overflowing.
 
   Widget _buildAttachmentSection() {
-    final attached = _fileName != null;
+    final attached = _pickedFile != null;
+    final fileName = _pickedFile?.name ?? '';
 
     return Container(
       decoration: BoxDecoration(
@@ -563,35 +582,42 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      attached ? 'Document attached' : 'Attach a document',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: attached ? _green : _inkDark,
-                        letterSpacing: -0.2,
+                // FIX: Expanded prevents this Column from pushing the
+                // trailing widget off-screen when the file name is long.
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        attached ? 'Document attached' : 'Attach a document',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: attached ? _green : _inkDark,
+                          letterSpacing: -0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      attached ? _fileName! : 'JPG, PNG, PDF or DOC · Max 10 MB',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: attached ? _green.withValues(alpha: 0.75) : _inkLight,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 2),
+                      Text(
+                        attached ? fileName : 'JPG, PNG, PDF or DOC · Max 10 MB',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: attached ? _green.withValues(alpha: 0.75) : _inkLight,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 if (attached)
                   GestureDetector(
-                    onTap: () => setState(() => _fileName = null),
+                    onTap: _removeFile,
                     child: Container(
                       width: 30,
                       height: 30,
@@ -696,11 +722,11 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                     width: 42,
                     height: 42,
                     decoration: BoxDecoration(
-                      color: _fileColor(_fileName!).withValues(alpha: 0.1),
+                      color: _fileColor(fileName).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(11),
                     ),
-                    child: Icon(_fileIcon(_fileName!),
-                        color: _fileColor(_fileName!), size: 20),
+                    child: Icon(_fileIcon(fileName),
+                        color: _fileColor(fileName), size: 20),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -708,7 +734,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _fileName!,
+                          fileName,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -730,6 +756,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   const Icon(Icons.check_circle_rounded, color: _green, size: 20),
                 ],
               ),
@@ -745,11 +772,11 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
                 border: Border(top: BorderSide(color: _border, width: 1)),
               ),
               child: Row(
-                children: [
+                children: const [
                   _FormatChip(icon: Icons.image_outlined,        label: 'JPG / PNG'),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   _FormatChip(icon: Icons.picture_as_pdf_outlined, label: 'PDF'),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   _FormatChip(icon: Icons.description_outlined,  label: 'DOC'),
                 ],
               ),
@@ -828,7 +855,7 @@ class _NewComplaintScreenState extends State<NewComplaintScreen>
     );
   }
 
-  // ── Submit Button (clean & professional) ──────────────────────────────────
+  // ── Submit Button ────────────────────────────────────────────────────────
 
   Widget _buildSubmitButton() {
     return Column(
@@ -939,6 +966,8 @@ class _NavBackButton extends StatelessWidget {
 }
 
 class _BrandTitle extends StatelessWidget {
+  const _BrandTitle();
+
   @override
   Widget build(BuildContext context) {
     return RichText(
@@ -978,6 +1007,8 @@ class _BrandTitle extends StatelessWidget {
 }
 
 class _HeaderBadge extends StatelessWidget {
+  const _HeaderBadge();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1007,6 +1038,8 @@ class _HeaderBadge extends StatelessWidget {
 }
 
 class _HeroCard extends StatelessWidget {
+  const _HeroCard();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1106,9 +1139,9 @@ class _HeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 15),
                     Row(
-                      children: [
+                      children: const [
                         _HeroChip(icon: Icons.access_time_rounded, label: '24h response'),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         _HeroChip(icon: Icons.lock_rounded, label: 'Confidential'),
                       ],
                     ),
@@ -1242,6 +1275,9 @@ class _CategoryMeta {
 }
 
 // ── Category tile ─────────────────────────────────────────────────────────────
+// FIX: trimmed internal spacing (icon size 36→34, gap after icon 10→8, gap
+// after label 2→1) to work together with the taller aspect ratio above and
+// give the tile a safety margin instead of exactly matching its content.
 
 class _CategoryTile extends StatefulWidget {
   final _CategoryMeta meta;
@@ -1278,7 +1314,7 @@ class _CategoryTileState extends State<_CategoryTile> {
         duration: const Duration(milliseconds: 100),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 170),
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: sel ? m.bg : _cardBg,
             borderRadius: BorderRadius.circular(16),
@@ -1298,19 +1334,20 @@ class _CategoryTileState extends State<_CategoryTile> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Stack(
                 clipBehavior: Clip.none,
                 children: [
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 170),
-                    width: 36,
-                    height: 36,
+                    width: 34,
+                    height: 34,
                     decoration: BoxDecoration(
                       color: m.accent.withValues(alpha: sel ? 0.18 : 0.09),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(m.icon, color: m.accent, size: 18),
+                    child: Icon(m.icon, color: m.accent, size: 17),
                   ),
                   if (sel)
                     Positioned(
@@ -1337,20 +1374,22 @@ class _CategoryTileState extends State<_CategoryTile> {
                     ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 m.label,
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: sel ? m.accent : _inkDark,
                   letterSpacing: -0.2,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 m.subtitle,
-                style: const TextStyle(fontSize: 9.5, color: _inkLight, height: 1.35),
+                style: const TextStyle(fontSize: 9.5, color: _inkLight, height: 1.3),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),

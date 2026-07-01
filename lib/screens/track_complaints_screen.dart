@@ -15,10 +15,6 @@ const Color _gradMid  = Color(0xFF5C6BC0);
 const Color _surface  = Color(0xFFF7F7FB);
 const Color _cardBg   = Colors.white;
 
-// Use ShaderMask or local gradients where needed instead of a global _grad constant.
-
-// Gradient mask helper removed (unused). Use ShaderMask directly where needed.
-
 class TrackComplaintsScreen extends StatefulWidget {
   final String userId;
 
@@ -30,11 +26,12 @@ class TrackComplaintsScreen extends StatefulWidget {
 
 class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     with SingleTickerProviderStateMixin {
-  int  total      = 0;
-  int  pending    = 0;
-  int  inProgress = 0;
-  int  resolved   = 0;
-  bool isLoading  = true;
+  int  total                = 0;
+  int  pending               = 0;
+  int  inProgress            = 0;
+  int  awaitingConfirmation  = 0; // resolved by admin, NOT yet confirmed by student
+  int  resolved              = 0; // resolved by admin AND confirmed by student
+  bool isLoading             = true;
 
   late AnimationController _controller;
   late Animation<double>   _fadeAnim;
@@ -58,6 +55,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
 
   // ── FETCH & COUNT ─────────────────────────────────────────────────────────
 
+  bool _parseConfirmed(dynamic v) {
+    return v == true || v == 1 || v.toString() == 'true' || v.toString() == '1';
+  }
+
   Future<void> fetchComplaintStats() async {
     try {
       final response = await http.get(
@@ -69,10 +70,13 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
 
         int _pending    = 0;
         int _inProgress = 0;
+        int _awaiting   = 0;
         int _resolved   = 0;
 
         for (final c in complaints) {
           final status = (c['status'] ?? '').toString().toLowerCase().trim();
+          final confirmed = _parseConfirmed(c['user_confirmed']);
+
           switch (status) {
             case 'new':
             case 'pending':
@@ -86,16 +90,24 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
               break;
             case 'resolved':
             case 'confirmed':
-              _resolved++;
+              // Only counts as truly "Resolved" once the student has confirmed it.
+              // Otherwise it's "Awaiting Confirmation" — same logic as the
+              // complaints list / detail screen.
+              if (confirmed) {
+                _resolved++;
+              } else {
+                _awaiting++;
+              }
               break;
           }
         }
 
         setState(() {
-          total      = complaints.length;
-          pending    = _pending;
-          inProgress = _inProgress;
-          resolved   = _resolved;
+          total               = complaints.length;
+          pending             = _pending;
+          inProgress          = _inProgress;
+          awaitingConfirmation = _awaiting;
+          resolved            = _resolved;
         });
       }
     } catch (e) {
@@ -166,6 +178,18 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                               ],
                             ),
                             const SizedBox(height: 14),
+                            // Awaiting confirmation gets its own card since it's
+                            // neither "in progress" nor truly "resolved" yet.
+                            _buildStatCard(
+                              count: awaitingConfirmation.toString(),
+                              title: 'Awaiting Confirmation',
+                              subtitle: 'Resolved by admin — confirm it\'s fixed',
+                              color: _primary,
+                              icon: Icons.verified_outlined,
+                              value: total == 0 ? 0 : awaitingConfirmation / total,
+                              fullWidth: true,
+                            ),
+                            const SizedBox(height: 14),
                             _buildResolvedBanner(),
                             const SizedBox(height: 6),
                           ],
@@ -216,33 +240,36 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                 ),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ShaderMask(
-                    blendMode: BlendMode.srcIn,
-                    shaderCallback: (bounds) => const LinearGradient(
-                      colors: [_primary, _accent],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ).createShader(bounds),
-                    child: const Text(
-                      'Track Complaints',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.4,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [_primary, _accent],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                      ).createShader(bounds),
+                      child: const Text(
+                        'Track Complaints',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -0.4,
+                        ),
                       ),
                     ),
-                  ),
-                  const Text(
-                    'Monitor your complaint status',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
-                  ),
-                ],
+                    const Text(
+                      'Monitor your complaint status',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
+                    ),
+                  ],
+                ),
               ),
-              const Spacer(),
               GestureDetector(
                 onTap: () async {
                   setState(() => isLoading = true);
@@ -284,13 +311,16 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: _primary,
-            letterSpacing: 1.5,
+        Flexible(
+          child: Text(
+            label,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: _primary,
+              letterSpacing: 1.5,
+            ),
           ),
         ),
       ],
@@ -434,9 +464,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
   // ── Progress Card ─────────────────────────────────────────────────────────
 
   Widget _buildProgressCard() {
-    final double pendingPct  = total == 0 ? 0 : pending / total;
-    final double progressPct = total == 0 ? 0 : inProgress / total;
-    final double resolvedPct = total == 0 ? 0 : resolved / total;
+    final double pendingPct   = total == 0 ? 0 : pending / total;
+    final double progressPct  = total == 0 ? 0 : inProgress / total;
+    final double awaitingPct  = total == 0 ? 0 : awaitingConfirmation / total;
+    final double resolvedPct  = total == 0 ? 0 : resolved / total;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
@@ -480,6 +511,13 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
           ),
           const SizedBox(height: 12),
           _buildProgressRow(
+            label: 'Awaiting Confirmation',
+            count: awaitingConfirmation,
+            percentage: awaitingPct,
+            color: _primary,
+          ),
+          const SizedBox(height: 12),
+          _buildProgressRow(
             label: 'Resolved',
             count: resolved,
             percentage: resolvedPct,
@@ -503,26 +541,33 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration:
-                      BoxDecoration(color: color, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF4A4A5A),
+            Expanded(
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration:
+                        BoxDecoration(color: color, shape: BoxShape.circle),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF4A4A5A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(width: 8),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   count.toString(),
@@ -567,8 +612,10 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
     required Color    color,
     required IconData icon,
     double value = 0,
+    bool fullWidth = false,
   }) {
     return Container(
+      width: fullWidth ? double.infinity : null,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
       decoration: BoxDecoration(
         color: _cardBg,
@@ -582,56 +629,117 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
+      child: fullWidth
+          ? Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1A1A2E),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
+                      ),
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: value.clamp(0.0, 1.0),
+                          minHeight: 4,
+                          backgroundColor: color.withValues(alpha: 0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  count,
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: -1,
+                    height: 1,
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  count,
+                  style: TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: -1,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A2E),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: value.clamp(0.0, 1.0),
+                    minHeight: 4,
+                    backgroundColor: color.withValues(alpha: 0.1),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
+                ),
+              ],
             ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            count,
-            style: TextStyle(
-              fontSize: 34,
-              fontWeight: FontWeight.w800,
-              color: color,
-              letterSpacing: -1,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF1A1A2E),
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: value.clamp(0.0, 1.0),
-              minHeight: 4,
-              backgroundColor: color.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -678,6 +786,7 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
               children: [
                 Text(
                   'Resolved',
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -687,12 +796,14 @@ class _TrackComplaintsScreenState extends State<TrackComplaintsScreen>
                 ),
                 SizedBox(height: 2),
                 Text(
-                  'Successfully closed complaints',
+                  'Confirmed by you as fixed',
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 11, color: Color(0xFF9090A0)),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [

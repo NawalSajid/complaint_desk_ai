@@ -1193,12 +1193,12 @@ class _HeaderBackground extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text('Manage your portal preferences', style: TextStyle(color: kWhite.withAlpha(150), fontSize: 12.5)),
                   const SizedBox(height: 18),
-                  const Wrap(
-                    spacing: 9,
-                    runSpacing: 8,
+                   Row(
                     children: [
                       _StatChip(label: 'Auto Assign', value: 'Role-based', icon: Icons.auto_fix_high, color: Color(0xFF80CBC4)),
+                      const SizedBox(width: 7),
                       _StatChip(label: 'Live Tracking', value: 'Real-Time', icon: Icons.location_searching_rounded, color: Color(0xFF80CBC4)),
+                      const SizedBox(width: 7),
                       _StatChip(label: 'Response Time', value: '24h Support', icon: Icons.support_agent_rounded, color: Color(0xFF80DEEA)),
                     ],
                   ),
@@ -1223,7 +1223,7 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
         color: kWhite.withAlpha(12),
         borderRadius: BorderRadius.circular(12),
@@ -1232,14 +1232,14 @@ class _StatChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 15),
-          const SizedBox(width: 6),
+          Icon(icon, color: color, size: 13),
+          const SizedBox(width: 5),
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold, height: 1)),
+                    style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold, height: 1)),
                 const SizedBox(height: 2),
                 Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: kWhite.withAlpha(130), fontSize: 9.5, fontWeight: FontWeight.w500)),

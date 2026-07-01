@@ -462,7 +462,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                   child: Text(
-                                    'Forgot password?',
+                                    '',
                                     style: TextStyle(
                                       color: _roleColor,
                                       fontSize: 12.5,

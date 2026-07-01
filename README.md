@@ -44,6 +44,8 @@ This project is a starting point for a Flutter application. To run it locally, f
 
 ## License & Copyright
 
+**FYP_SCreens_UI**: [FYP_UI_SCREENS.docx](https://github.com/user-attachments/files/29574646/FYP_UI_SCREENS.docx)
+
 © 2026 Nawal Sajid. All rights reserved.
 
 

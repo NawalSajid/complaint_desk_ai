@@ -10,7 +10,7 @@ ComplaintDesk.AI is a Flutter-based mobile application that allows users to regi
 - **Real-Time Complaint History**: View submitted complaints with status, priority, and timestamps.
 - **Profile Management**: Update user information directly in the app.
 - **Navigation & UI**: Intuitive navigation between Home, Complaints, Track, and Profile screens.
-- **Future Enhancements**: Admin portal notification and advanced feedback system.
+- **Admin portal**: Handles admin related functionalities.
 
 ## Getting Started
 
